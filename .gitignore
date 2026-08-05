@@ -1,0 +1,19 @@
+# Logs
+logs
+*.log
+
+# Runtime
+pids
+*.pid
+*.seed
+
+# Dependencies / IDE
+node_modules
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Local env
+.env
+.env.*
