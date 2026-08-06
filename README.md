@@ -1,18 +1,30 @@
 # Markdown Tools
 
-ویرایشگر مارک‌داون راست‌به‌چپ با پیش‌نمایش زنده.
+RTL Markdown editor with live preview — built for [karnoweb.ir](https://karnoweb.ir).
 
-## امکانات
+## Features
 
-- ویرایش و پیش‌نمایش هم‌زمان (RTL / LTR)
-- تم روشن/تاریک و پالت‌های DaisyUI
-- هایلایت کد (Prism) و دیاگرام (Mermaid)
-- خروجی از باکس نتیجه: HTML، Markdown، PDF
+- Pro layout: slim header + file history sidebar + editor/preview
+- Local document history in `localStorage` (create, open, rename, delete)
+- Side-by-side edit and preview (RTL / LTR)
+- Karnoweb brand themes (Pro Dark / Pro Light)
+- Code highlighting (Prism) and diagrams (Mermaid)
+- Export: HTML, Markdown, PDF, image (PNG)
 
-## اجرا
+## Shortcuts
 
-فایل‌ها را با یک وب‌سرور استاتیک سرو کنید (مثلاً Laragon) و `index.html` را باز کنید.
+- `Ctrl/Cmd+S` save active document
+- `Ctrl/Cmd+N` new document
+- `Esc` exit full preview / close mobile sidebar
 
-## لایسنس
+## QA
 
-MIT — ببینید [`license`](license).
+Append `?selfcheck=1` to the URL to run a small title/id self-check in the console.
+
+## Run
+
+Serve the files with a static web server (e.g. Laragon) and open `index.html`.
+
+## License
+
+MIT — see [`license`](license).

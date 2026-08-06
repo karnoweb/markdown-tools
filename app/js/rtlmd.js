@@ -3,15 +3,21 @@
 
 	var INIT_URL = 'initcontent.md';
 	var STORAGE_KEY = 'rtlmd-content';
+	var DOCS_KEY = 'rtlmd-docs';
+	var ACTIVE_ID_KEY = 'rtlmd-active-id';
+	var SIDEBAR_KEY = 'rtlmd-sidebar';
 	var THEME_KEY = 'rtlmd-theme';
 	var DIR_KEY = 'rtlmd-dir';
 	var FONT_KEY = 'rtlmd-font-size';
 	var FULLVIEW_KEY = 'rtlmd-fullview';
+	var MAX_DOCS = 40;
+	var UNTITLED = 'Untitled';
 
 	var DARK_THEMES = {
 		dark: 1, night: 1, dracula: 1, dim: 1, nord: 1, sunset: 1,
 		forest: 1, luxury: 1, coffee: 1, business: 1, halloween: 1,
-		synthwave: 1, black: 1, cyberpunk: 1
+		synthwave: 1, black: 1, cyberpunk: 1,
+		'karnoweb-dark': 1
 	};
 
 	var PRISM_THEME_DARK = 'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css';
@@ -138,13 +144,15 @@
 
 	function resolveTheme(pref) {
 		if (!pref || pref === 'system') {
-			return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+			return window.matchMedia('(prefers-color-scheme: dark)').matches
+				? 'karnoweb-dark'
+				: 'karnoweb';
 		}
 		return pref;
 	}
 
 	function getThemePref() {
-		return storageGet(THEME_KEY, 'system');
+		return storageGet(THEME_KEY, 'karnoweb-dark');
 	}
 
 	function applyPrismTheme(/* resolvedTheme */) {
@@ -224,7 +232,7 @@
 	function applyFontSize(size) {
 		var large = size === 'large';
 		document.documentElement.classList.toggle('font-large', large);
-		$('#font-size-label').text(large ? 'عادی' : 'بزرگ');
+		$('#font-size-label').text(large ? 'Normal' : 'Large');
 		$('#font-size-toggle').toggleClass('btn-active', large);
 		storageSet(FONT_KEY, size);
 	}
@@ -235,7 +243,7 @@
 
 	function setFullview(on) {
 		$('body').toggleClass('fullview', on);
-		$('#fullview-label').text(on ? 'بازگشت به ویرایش' : 'نمایش کامل');
+		$('#fullview-label').text(on ? 'Exit full preview' : 'Full preview');
 		$('#fullview-icon-expand').toggleClass('hidden', on);
 		$('#fullview-icon-collapse').toggleClass('hidden', !on);
 		storageSet(FULLVIEW_KEY, on ? '1' : '0');
@@ -243,6 +251,345 @@
 
 	function initFullview() {
 		setFullview(storageGet(FULLVIEW_KEY, '0') === '1');
+	}
+
+	function setSidebarOpen(on) {
+		document.documentElement.classList.toggle('sidebar-collapsed', !on);
+		$('#sidebar-toggle').attr('aria-expanded', on ? 'true' : 'false');
+		var mobile = window.matchMedia('(max-width: 900px)').matches;
+		$('#sidebar-backdrop').prop('hidden', !(on && mobile));
+		storageSet(SIDEBAR_KEY, on ? '1' : '0');
+	}
+
+	function initSidebar() {
+		var open = storageGet(SIDEBAR_KEY, '1') !== '0';
+		setSidebarOpen(open);
+	}
+
+	/* ── Document history (localStorage) ───────────────── */
+	var docsState = { items: [], activeId: null };
+
+	function uid() {
+		return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+	}
+
+	function titleFromContent(md) {
+		var text = String(md || '');
+		var heading = text.match(/^\s{0,3}#{1,6}\s+(.+?)\s*$/m);
+		if (heading) {
+			var h = heading[1].replace(/[*_`~#\[\]]/g, '').trim();
+			if (h) return h.slice(0, 80);
+		}
+		var lines = text.trim().split(/\r?\n/);
+		var first = '';
+		for (var i = 0; i < lines.length; i++) {
+			if (lines[i].trim()) {
+				first = lines[i];
+				break;
+			}
+		}
+		if (!first) return UNTITLED;
+		return first.replace(/^#+\s*/, '').trim().slice(0, 80) || UNTITLED;
+	}
+
+	function slugifyFilename(title) {
+		var s = String(title || UNTITLED)
+			.replace(/[\\/:*?"<>|]+/g, '-')
+			.replace(/\s+/g, '-')
+			.replace(/-+/g, '-')
+			.replace(/^-|-$/g, '');
+		return (s || 'markdown-tools').slice(0, 60);
+	}
+
+	function readDocsRaw() {
+		try {
+			var raw = storageGet(DOCS_KEY, null);
+			if (!raw) return null;
+			var parsed = JSON.parse(raw);
+			return Array.isArray(parsed) ? parsed : null;
+		} catch (e) {
+			return null;
+		}
+	}
+
+	function writeDocs(items) {
+		docsState.items = items;
+		try {
+			storageSet(DOCS_KEY, JSON.stringify(items));
+			return true;
+		} catch (e) {
+			window.alert('Could not save history (browser storage may be full).');
+			return false;
+		}
+	}
+
+	function sortDocs(items) {
+		/* ponytail: stable order by creation time — editing must not reshuffle the list */
+		return items.slice().sort(function (a, b) {
+			return (b.createdAt || 0) - (a.createdAt || 0);
+		});
+	}
+
+	function findDoc(id) {
+		for (var i = 0; i < docsState.items.length; i++) {
+			if (docsState.items[i].id === id) return docsState.items[i];
+		}
+		return null;
+	}
+
+	function formatDocTime(ts) {
+		try {
+			return new Date(ts).toLocaleString(undefined, {
+				month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+			});
+		} catch (e) {
+			return '';
+		}
+	}
+
+	function updateActiveTitleUi(title) {
+		var el = document.getElementById('active-doc-title');
+		if (!el) return;
+		el.textContent = title || '';
+		el.title = title || '';
+	}
+
+	function renderDocList() {
+		var $list = $('#doc-list');
+		var $empty = $('#doc-empty');
+		if (!$list.length) return;
+
+		var items = sortDocs(docsState.items);
+		$list.empty();
+		$empty.toggleClass('hidden', items.length > 0);
+
+		items.forEach(function (doc) {
+			var active = doc.id === docsState.activeId;
+			var $li = $('<li class="doc-item" role="listitem"></li>');
+			if (active) $li.addClass('is-active');
+			$li.attr('data-id', doc.id);
+
+			var $open = $('<button type="button" class="doc-open"></button>');
+			$open.append($('<span class="doc-title"></span>').text(doc.title || UNTITLED));
+			$open.append($('<span class="doc-meta"></span>').text(formatDocTime(doc.createdAt || doc.updatedAt)));
+			$open.attr('title', doc.title || UNTITLED);
+
+			var $actions = $('<div class="doc-actions"></div>');
+			$actions.append(
+				$('<button type="button" class="doc-rename icon-btn-xs" title="Rename">✎</button>'),
+				$('<button type="button" class="doc-delete icon-btn-xs" title="Delete">×</button>')
+			);
+
+			$li.append($open, $actions);
+			$list.append($li);
+		});
+	}
+
+	function persistActiveFromEditor(opts) {
+		opts = opts || {};
+		if (!$editor || !$editor.length || !docsState.activeId) return;
+		var doc = findDoc(docsState.activeId);
+		if (!doc) return;
+		var content = $editor.val();
+		doc.content = content;
+		doc.updatedAt = Date.now();
+		if (!opts.keepTitle) {
+			doc.title = titleFromContent(content);
+		}
+		writeDocs(docsState.items);
+		storageSet(STORAGE_KEY, content);
+		updateActiveTitleUi(doc.title);
+		if (!opts.silentList) renderDocList();
+	}
+
+	function loadDocIntoEditor(doc, opts) {
+		opts = opts || {};
+		docsState.activeId = doc.id;
+		storageSet(ACTIVE_ID_KEY, doc.id);
+		if ($editor && $editor.length) {
+			$editor.val(doc.content || '');
+		}
+		updateActiveTitleUi(doc.title || UNTITLED);
+		storageSet(STORAGE_KEY, doc.content || '');
+		if (!opts.skipRender) renderPreview();
+		renderDocList();
+	}
+
+	function createDoc(content, title) {
+		persistActiveFromEditor({ silentList: true });
+		var items = docsState.items.slice();
+		if (items.length >= MAX_DOCS) {
+			items = sortDocs(items);
+			var victims = items.filter(function (d) { return d.id !== docsState.activeId; });
+			while (items.length >= MAX_DOCS && victims.length) {
+				var drop = victims.pop();
+				items = items.filter(function (d) { return d.id !== drop.id; });
+			}
+			if (items.length >= MAX_DOCS) {
+				window.alert('Document limit (' + MAX_DOCS + ') reached. Delete one first.');
+				return null;
+			}
+		}
+		var now = Date.now();
+		var doc = {
+			id: uid(),
+			title: title || titleFromContent(content || '') || UNTITLED,
+			content: content || '',
+			updatedAt: now,
+			createdAt: now
+		};
+		items.unshift(doc);
+		writeDocs(items);
+		loadDocIntoEditor(doc);
+		return doc;
+	}
+
+	function openDoc(id) {
+		if (!id || id === docsState.activeId) return;
+		var doc = findDoc(id);
+		if (!doc) return;
+		persistActiveFromEditor({ silentList: true });
+		loadDocIntoEditor(doc);
+		if (window.matchMedia('(max-width: 900px)').matches) {
+			setSidebarOpen(false);
+		}
+	}
+
+	function renameDoc(id) {
+		var doc = findDoc(id);
+		if (!doc) return;
+		var next = window.prompt('Document name:', doc.title || UNTITLED);
+		if (next === null) return;
+		next = String(next).trim().slice(0, 80);
+		if (!next) next = UNTITLED;
+		doc.title = next;
+		writeDocs(docsState.items);
+		if (doc.id === docsState.activeId) updateActiveTitleUi(doc.title);
+		renderDocList();
+	}
+
+	function deleteDoc(id) {
+		if (docsState.items.length <= 1) {
+			window.alert('At least one document must remain.');
+			return;
+		}
+		var doc = findDoc(id);
+		if (!doc) return;
+		if (!window.confirm('Delete "' + (doc.title || UNTITLED) + '"?')) return;
+		var wasActive = doc.id === docsState.activeId;
+		var items = docsState.items.filter(function (d) { return d.id !== id; });
+		writeDocs(items);
+		if (wasActive) {
+			loadDocIntoEditor(sortDocs(items)[0]);
+		} else {
+			renderDocList();
+		}
+	}
+
+	function migrateLegacyContent() {
+		var legacy = storageGet(STORAGE_KEY, null);
+		if (!legacy) legacy = storageGet('content', null);
+		if (legacy === null || legacy === '') return null;
+		return {
+			id: uid(),
+			title: titleFromContent(legacy),
+			content: legacy,
+			updatedAt: Date.now(),
+			createdAt: Date.now()
+		};
+	}
+
+	function ensureDocsBootstrapped(seedContent) {
+		var existing = readDocsRaw();
+		if (existing && existing.length) {
+			docsState.items = existing.map(function (d) {
+				return {
+					id: d.id || uid(),
+					title: d.title || titleFromContent(d.content) || UNTITLED,
+					content: typeof d.content === 'string' ? d.content : '',
+					updatedAt: d.updatedAt || Date.now(),
+					createdAt: d.createdAt || d.updatedAt || Date.now()
+				};
+			});
+			writeDocs(docsState.items);
+			var wanted = storageGet(ACTIVE_ID_KEY, null);
+			var active = (wanted && findDoc(wanted)) || sortDocs(docsState.items)[0];
+			loadDocIntoEditor(active, { skipRender: false });
+			return;
+		}
+
+		var migrated = migrateLegacyContent();
+		if (migrated) {
+			writeDocs([migrated]);
+			loadDocIntoEditor(migrated);
+			return;
+		}
+
+		var content = typeof seedContent === 'string' ? seedContent : '';
+		var doc = {
+			id: uid(),
+			title: titleFromContent(content),
+			content: content,
+			updatedAt: Date.now(),
+			createdAt: Date.now()
+		};
+		writeDocs([doc]);
+		loadDocIntoEditor(doc);
+	}
+
+	function bindDocsUi() {
+		$('#doc-new').on('click', function () {
+			createDoc('# New document\n\n');
+		});
+
+		$('#doc-list').on('click', '.doc-open', function () {
+			openDoc($(this).closest('.doc-item').data('id'));
+		});
+
+		$('#doc-list').on('click', '.doc-rename', function (e) {
+			e.stopPropagation();
+			renameDoc($(this).closest('.doc-item').data('id'));
+		});
+
+		$('#doc-list').on('click', '.doc-delete', function (e) {
+			e.stopPropagation();
+			deleteDoc($(this).closest('.doc-item').data('id'));
+		});
+
+		$('#sidebar-toggle').on('click', function () {
+			setSidebarOpen(document.documentElement.classList.contains('sidebar-collapsed'));
+		});
+
+		$('#sidebar-backdrop').on('click', function () {
+			setSidebarOpen(false);
+		});
+
+		$(window).on('beforeunload', function () {
+			persistActiveFromEditor({ silentList: true, keepTitle: false });
+		});
+	}
+
+	function runDocsSelfCheck() {
+		var fails = [];
+		function ok(cond, msg) {
+			if (!cond) fails.push(msg);
+		}
+		ok(titleFromContent('# Hello world\n\nx') === 'Hello world', 'heading title');
+		ok(titleFromContent('   ') === UNTITLED, 'empty title');
+		ok(titleFromContent('First line\nsecond') === 'First line', 'first line title');
+		ok(!!uid() && uid() !== uid(), 'uid uniqueness');
+		ok(slugifyFilename('a/b:c').indexOf('/') === -1, 'slugify');
+		ok(sortDocs([
+			{ id: 'a', createdAt: 1 },
+			{ id: 'b', createdAt: 3 },
+			{ id: 'c', createdAt: 2 }
+		]).map(function (d) { return d.id; }).join('') === 'bca', 'sort by createdAt');
+		if (fails.length) {
+			console.error('[rtlmd selfcheck] FAIL', fails);
+			window.alert('Self-check failed: ' + fails.join(', '));
+		} else {
+			console.info('[rtlmd selfcheck] OK');
+		}
 	}
 
 	var $editor = null;
@@ -253,7 +600,7 @@
 		try {
 			$('#output').html(parseMarkdown($editor.val()));
 		} catch (err) {
-			$('#output').html('<p class="render-error">خطا در رندر markdown</p>');
+			$('#output').html('<p class="render-error">Markdown render error</p>');
 			return;
 		}
 		highlightCode();
@@ -261,8 +608,14 @@
 	}
 
 	function saveContent() {
-		if (!$editor || !$editor.length) return;
-		storageSet(STORAGE_KEY, $editor.val());
+		persistActiveFromEditor({ silentList: true });
+		var doc = findDoc(docsState.activeId);
+		if (!doc) return;
+		var $active = $('#doc-list .doc-item.is-active');
+		if (!$active.length) return;
+		$active.find('.doc-title').text(doc.title || UNTITLED);
+		$active.find('.doc-meta').text(formatDocTime(doc.createdAt || doc.updatedAt));
+		$active.find('.doc-open').attr('title', doc.title || UNTITLED);
 	}
 
 	function downloadFile(content, filename, type) {
@@ -275,6 +628,36 @@
 		link.click();
 		link.remove();
 		setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+	}
+
+	function downloadDataUrl(dataUrl, filename) {
+		var link = document.createElement('a');
+		link.href = dataUrl;
+		link.download = filename;
+		document.body.appendChild(link);
+		link.click();
+		link.remove();
+	}
+
+	function loadScriptOnce(src, globalName) {
+		if (globalName && window[globalName]) return Promise.resolve();
+		var existing = document.querySelector('script[data-rtlmd-src="' + src + '"]');
+		if (existing) {
+			return new Promise(function (resolve, reject) {
+				if (globalName && window[globalName]) return resolve();
+				existing.addEventListener('load', function () { resolve(); });
+				existing.addEventListener('error', reject);
+			});
+		}
+		return new Promise(function (resolve, reject) {
+			var script = document.createElement('script');
+			script.src = src;
+			script.async = true;
+			script.setAttribute('data-rtlmd-src', src);
+			script.onload = function () { resolve(); };
+			script.onerror = reject;
+			document.head.appendChild(script);
+		});
 	}
 
 	function prepareExportRoot() {
@@ -393,11 +776,13 @@
 	}
 
 	function exportHtml() {
-		downloadFile(buildExportDocument(false), 'markdown-tools.html', 'text/html');
+		var name = slugifyFilename(findDoc(docsState.activeId) && findDoc(docsState.activeId).title) + '.html';
+		downloadFile(buildExportDocument(false), name, 'text/html');
 	}
 
 	function exportMarkdown() {
-		downloadFile($editor ? $editor.val() : '', 'markdown-tools.md', 'text/markdown');
+		var name = slugifyFilename(findDoc(docsState.activeId) && findDoc(docsState.activeId).title) + '.md';
+		downloadFile($editor ? $editor.val() : '', name, 'text/markdown');
 	}
 
 	function whenPrintReady(win) {
@@ -420,7 +805,7 @@
 		var printWindow = window.open(url, '_blank');
 		if (!printWindow) {
 			URL.revokeObjectURL(url);
-			window.alert('برای خروجی PDF، اجازه بازشدن پنجره جدید را فعال کنید.');
+			window.alert('Allow pop-ups to export PDF.');
 			return;
 		}
 
@@ -458,10 +843,59 @@
 		}
 	}
 
+	function exportImage() {
+		var node = document.getElementById('output');
+		if (!node) return;
+
+		var btn = document.querySelector('[data-export="image"]');
+		if (btn) btn.disabled = true;
+
+		var prev = {
+			height: node.style.height,
+			maxHeight: node.style.maxHeight,
+			overflow: node.style.overflow
+		};
+		var fullWidth = Math.max(node.scrollWidth, node.clientWidth);
+		var fullHeight = Math.max(node.scrollHeight, node.clientHeight);
+		/* ponytail: expand scroll box so full content is captured, not just viewport */
+		node.style.height = fullHeight + 'px';
+		node.style.maxHeight = 'none';
+		node.style.overflow = 'visible';
+
+		var bg = window.getComputedStyle(node).backgroundColor || '#ffffff';
+
+		loadScriptOnce(
+			'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js',
+			'htmlToImage'
+		).then(function () {
+			if (!window.htmlToImage || !window.htmlToImage.toPng) {
+				throw new Error('html-to-image unavailable');
+			}
+			return window.htmlToImage.toPng(node, {
+				width: fullWidth,
+				height: fullHeight,
+				pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+				backgroundColor: bg,
+				cacheBust: true
+			});
+		}).then(function (dataUrl) {
+			var name = slugifyFilename(findDoc(docsState.activeId) && findDoc(docsState.activeId).title) + '.png';
+			downloadDataUrl(dataUrl, name);
+		}).catch(function () {
+			window.alert('Image export failed. Check your connection and try again.');
+		}).then(function () {
+			node.style.height = prev.height;
+			node.style.maxHeight = prev.maxHeight;
+			node.style.overflow = prev.overflow;
+			if (btn) btn.disabled = false;
+		});
+	}
+
 	function exportResult(format) {
 		if (format === 'html') exportHtml();
 		if (format === 'markdown') exportMarkdown();
 		if (format === 'pdf') exportPdf();
+		if (format === 'image') exportImage();
 	}
 
 	function debounce(fn, ms) {
@@ -493,25 +927,24 @@
 	}
 
 	function loadInitialContent() {
-		var stored = storageGet(STORAGE_KEY, null);
-		if (!stored) {
-			stored = storageGet('content', null);
+		var existing = readDocsRaw();
+		if (existing && existing.length) {
+			ensureDocsBootstrapped();
+			return;
 		}
 
-		if (stored !== null && stored !== '') {
-			$('#textbox textarea').val(stored);
-			renderPreview();
+		var legacy = storageGet(STORAGE_KEY, null) || storageGet('content', null);
+		if (legacy !== null && legacy !== '') {
+			ensureDocsBootstrapped();
 			return;
 		}
 
 		$.get(INIT_URL)
 			.done(function (data) {
-				$('#textbox textarea').val(data);
-				renderPreview();
+				ensureDocsBootstrapped(data);
 			})
 			.fail(function () {
-				$('#textbox textarea').val('# Markdown Tools\n\nشروع به نوشتن کنید…');
-				renderPreview();
+				ensureDocsBootstrapped('# Markdown Tools\n\nStart writing…');
 			});
 	}
 
@@ -520,12 +953,14 @@
 		initDirection();
 		initFontSize();
 		initFullview();
+		initSidebar();
+		bindDocsUi();
 
 		$('#dir-rtl').on('click', function () { applyDirection('rtl'); });
 		$('#dir-ltr').on('click', function () { applyDirection('ltr'); });
 
 		$('#theme-toggle').on('change', function () {
-			applyTheme(this.checked ? 'light' : 'dark');
+			applyTheme(this.checked ? 'karnoweb' : 'karnoweb-dark');
 		});
 
 		$('#palette-select').on('change', function () {
@@ -546,10 +981,29 @@
 		});
 
 		$(document).on('keydown', function (e) {
-			if (e.key === 'Escape' && $('body').hasClass('fullview')) {
-				setFullview(false);
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+				e.preventDefault();
+				persistActiveFromEditor();
+				return;
+			}
+			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+				e.preventDefault();
+				createDoc('# New document\n\n');
+				return;
+			}
+			if (e.key === 'Escape') {
+				if ($('body').hasClass('fullview')) {
+					setFullview(false);
+				} else if (window.matchMedia('(max-width: 900px)').matches &&
+					!document.documentElement.classList.contains('sidebar-collapsed')) {
+					setSidebarOpen(false);
+				}
 			}
 		});
+
+		if (/[?&]selfcheck=1(?:&|$)/.test(location.search)) {
+			runDocsSelfCheck();
+		}
 	}
 
 	$(document).ready(function () {
