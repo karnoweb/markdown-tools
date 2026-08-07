@@ -10,6 +10,7 @@
 	var DIR_KEY = 'rtlmd-dir';
 	var FONT_KEY = 'rtlmd-font-size';
 	var FULLVIEW_KEY = 'rtlmd-fullview';
+	var SCROLL_SYNC_KEY = 'rtlmd-scroll-sync';
 	var PREFS_VER_KEY = 'rtlmd-prefs-ver';
 	var PREFS_VER = '3';
 	var MAX_DOCS = 40;
@@ -44,6 +45,15 @@
 			lang = parts.length ? parts[parts.length - 1] : lang;
 		}
 		return LANG_ALIASES[lang] || lang.replace(/[^a-z0-9+#.-]/gi, '');
+	}
+
+	/* Custom marked renderers own escaping — without this, <?php ... $table-> eats the DOM as a bogus comment. */
+	function escapeHtml(s) {
+		return String(s)
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;');
 	}
 
 	var contentDir = 'ltr';
@@ -99,20 +109,21 @@
 
 	renderer.code = function (code, lang) {
 		var norm = normalizeLang(lang);
+		var safe = escapeHtml(code);
 		if (norm === 'mermaid') {
-			return '<div class="mermaid-wrap" dir="ltr"><pre class="mermaid">' + code + '</pre></div>';
+			return '<div class="mermaid-wrap" dir="ltr"><pre class="mermaid">' + safe + '</pre></div>';
 		}
 		var langAttr = norm || 'none';
 		var label = norm
-			? '<span class="code-lang" dir="ltr">' + norm + '</span>'
+			? '<span class="code-lang" dir="ltr">' + escapeHtml(norm) + '</span>'
 			: '';
 		return '<pre dir="ltr" class="code-block language-' + langAttr + '">' +
 			label +
-			'<code dir="ltr" class="language-' + langAttr + '">' + code + '</code></pre>';
+			'<code dir="ltr" class="language-' + langAttr + '">' + safe + '</code></pre>';
 	};
 
 	renderer.codespan = function (code) {
-		return '<code dir="ltr" class="codespan">' + code + '</code>';
+		return '<code dir="ltr" class="codespan">' + escapeHtml(code) + '</code>';
 	};
 
 	renderer.link = function (href, title, text) {
@@ -177,11 +188,58 @@
 		return isDarkTheme(resolveTheme(getThemePref())) ? 'dark' : 'default';
 	}
 
+	/* Persian/Arabic runs; spaces only when next char is also Arabic (keeps Latin tokens out) */
+	var BIDI_RUN_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF](?:[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200c\u200d،؛؟:!.,…]|\s+(?=[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]))*/g;
+
+	function enhanceCodeBidi(codeEl) {
+		if (!codeEl || codeEl.nodeType !== 1) return;
+		if (codeEl.querySelector(':scope > .token bdi.code-bidi, :scope > bdi.code-bidi, bdi.code-bidi')) {
+			/* already wrapped for current highlight output */
+			return;
+		}
+		var walker = document.createTreeWalker(codeEl, NodeFilter.SHOW_TEXT, null);
+		var nodes = [];
+		while (walker.nextNode()) nodes.push(walker.currentNode);
+		for (var i = 0; i < nodes.length; i++) {
+			var node = nodes[i];
+			var text = node.nodeValue;
+			if (!text || text.search(/[\u0600-\u06FF]/) === -1) continue;
+			BIDI_RUN_RE.lastIndex = 0;
+			if (!BIDI_RUN_RE.test(text)) continue;
+			BIDI_RUN_RE.lastIndex = 0;
+			var frag = document.createDocumentFragment();
+			var last = 0;
+			var m;
+			while ((m = BIDI_RUN_RE.exec(text))) {
+				if (m.index > last) {
+					frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+				}
+				var bdi = document.createElement('bdi');
+				bdi.className = 'code-bidi';
+				bdi.textContent = m[0];
+				frag.appendChild(bdi);
+				last = m.index + m[0].length;
+			}
+			if (last < text.length) {
+				frag.appendChild(document.createTextNode(text.slice(last)));
+			}
+			node.parentNode.replaceChild(frag, node);
+		}
+	}
+
 	function highlightCode() {
 		if (typeof Prism === 'undefined') return;
+		if (!Prism._rtlmdBidiHook && Prism.hooks) {
+			Prism._rtlmdBidiHook = true;
+			Prism.hooks.add('after-highlight', function (env) {
+				if (env && env.element) enhanceCodeBidi(env.element);
+			});
+		}
 		$('#output pre.code-block code').each(function () {
 			try {
 				Prism.highlightElement(this);
+				/* ponytail: autoloader may skip after-highlight when lang already in DOM */
+				enhanceCodeBidi(this);
 			} catch (e) {
 				/* ponytail: skip blocks whose language/plugin is missing */
 			}
@@ -199,7 +257,9 @@
 				securityLevel: 'loose',
 				fontFamily: 'Vazirmatn, Tahoma, sans-serif'
 			});
-			mermaid.run({ nodes: nodes }).catch(function () {
+			mermaid.run({ nodes: nodes }).then(function () {
+				if (scrollSyncOn) refreshScrollMaps();
+			}).catch(function () {
 				/* ponytail: bad diagram syntax — source stays visible in pre */
 			});
 		} catch (e) { /* ponytail: mermaid unavailable */ }
@@ -274,6 +334,258 @@
 
 	function initFullview() {
 		setFullview(storageGet(FULLVIEW_KEY, '0') === '1');
+	}
+
+	var scrollSyncOn = false;
+	var syncingScroll = false;
+	var scrollMapReady = false;
+	var editorLineYs = null; /* 1-based: Y at start of each source line; [lines+1]=end */
+	var $scrollMirror = null;
+
+	function lineAtIndex(src, index) {
+		var n = 1;
+		var end = Math.min(index, src.length);
+		for (var i = 0; i < end; i++) {
+			if (src.charCodeAt(i) === 10) n++;
+		}
+		return n;
+	}
+
+	/* Top-level marked tokens → #output children (skip space). */
+	function sourceBlockRanges(src) {
+		var tokens = marked.lexer(src || '');
+		var ranges = [];
+		var offset = 0;
+		for (var i = 0; i < tokens.length; i++) {
+			var raw = tokens[i].raw || '';
+			if (tokens[i].type !== 'space') {
+				var start = lineAtIndex(src, offset);
+				var last = offset + raw.length;
+				while (last > offset && src.charCodeAt(last - 1) === 10) last--;
+				ranges.push({ start: start, end: lineAtIndex(src, Math.max(offset, last - 1)) });
+			}
+			offset += raw.length;
+		}
+		return ranges;
+	}
+
+	function annotatePreviewBlocks(src) {
+		var out = document.getElementById('output');
+		if (!out) return false;
+		var ranges = sourceBlockRanges(src);
+		var kids = out.children;
+		var n = Math.min(kids.length, ranges.length);
+		for (var i = 0; i < kids.length; i++) {
+			kids[i].removeAttribute('data-line-start');
+			kids[i].removeAttribute('data-line-end');
+		}
+		if (!n || kids.length !== ranges.length) {
+			scrollMapReady = false;
+			return false;
+		}
+		for (var j = 0; j < n; j++) {
+			kids[j].setAttribute('data-line-start', String(ranges[j].start));
+			kids[j].setAttribute('data-line-end', String(ranges[j].end));
+		}
+		return true;
+	}
+
+	function ensureScrollMirror() {
+		if ($scrollMirror && $scrollMirror.length) return $scrollMirror[0];
+		var el = document.createElement('div');
+		el.id = 'scroll-sync-mirror';
+		el.setAttribute('aria-hidden', 'true');
+		document.body.appendChild(el);
+		$scrollMirror = $(el);
+		return el;
+	}
+
+	function rebuildEditorLineYs() {
+		if (!$editor || !$editor.length) {
+			editorLineYs = null;
+			return;
+		}
+		var ta = $editor[0];
+		var src = ta.value;
+		var lines = src.split('\n');
+		var mirror = ensureScrollMirror();
+		var cs = window.getComputedStyle(ta);
+		var padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+		mirror.style.width = Math.max(0, ta.clientWidth - padX) + 'px';
+		mirror.style.fontFamily = cs.fontFamily;
+		mirror.style.fontSize = cs.fontSize;
+		mirror.style.fontWeight = cs.fontWeight;
+		mirror.style.fontStyle = cs.fontStyle;
+		mirror.style.lineHeight = cs.lineHeight;
+		mirror.style.letterSpacing = cs.letterSpacing;
+		mirror.style.wordSpacing = cs.wordSpacing;
+		mirror.style.tabSize = cs.tabSize;
+		mirror.style.whiteSpace = 'pre-wrap';
+		mirror.style.overflowWrap = 'break-word';
+		mirror.style.wordBreak = cs.wordBreak;
+		mirror.style.boxSizing = 'content-box';
+
+		var html = '';
+		for (var i = 0; i < lines.length; i++) {
+			html += '<div>' + (lines[i] ? escapeHtml(lines[i]) : '&nbsp;') + '</div>';
+		}
+		mirror.innerHTML = html;
+		var ys = [0];
+		var nodes = mirror.children;
+		for (var k = 0; k < nodes.length; k++) {
+			ys.push(nodes[k].offsetTop);
+		}
+		ys.push(mirror.scrollHeight);
+		editorLineYs = ys;
+	}
+
+	function lineFracFromEditorScroll(scrollTop) {
+		var ys = editorLineYs;
+		if (!ys || ys.length < 3) return 1;
+		var y = Math.max(0, scrollTop);
+		var lo = 1;
+		var hi = ys.length - 2;
+		while (lo < hi) {
+			var mid = (lo + hi + 1) >> 1;
+			if (ys[mid] <= y) lo = mid;
+			else hi = mid - 1;
+		}
+		var y0 = ys[lo];
+		var y1 = ys[lo + 1];
+		var span = Math.max(1, y1 - y0);
+		return lo + Math.min(1, Math.max(0, (y - y0) / span));
+	}
+
+	function scrollEditorToLineFrac(lineFrac) {
+		if (!$editor || !$editor.length || !editorLineYs) return;
+		var ys = editorLineYs;
+		var maxLine = ys.length - 2;
+		var line = Math.min(maxLine, Math.max(1, lineFrac));
+		var i = Math.min(maxLine, Math.floor(line));
+		var f = line - i;
+		var y0 = ys[i];
+		var y1 = ys[Math.min(ys.length - 1, i + 1)];
+		$editor[0].scrollTop = y0 + f * (y1 - y0);
+	}
+
+	function blockOffsetTop(block, container) {
+		var cr = container.getBoundingClientRect();
+		var br = block.getBoundingClientRect();
+		return br.top - cr.top + container.scrollTop;
+	}
+
+	function findBlockForLine(out, line) {
+		var kids = out.children;
+		var fallback = null;
+		for (var i = 0; i < kids.length; i++) {
+			var s = parseInt(kids[i].getAttribute('data-line-start'), 10);
+			var e = parseInt(kids[i].getAttribute('data-line-end'), 10);
+			if (!s) continue;
+			fallback = kids[i];
+			if (line <= e) return kids[i];
+		}
+		return fallback;
+	}
+
+	function findBlockAtScroll(out, scrollTop) {
+		var kids = out.children;
+		var y = Math.max(0, scrollTop);
+		var last = null;
+		for (var i = 0; i < kids.length; i++) {
+			var top = blockOffsetTop(kids[i], out);
+			if (top + kids[i].offsetHeight > y) return kids[i];
+			last = kids[i];
+		}
+		return last;
+	}
+
+	function scrollMax(el) {
+		return Math.max(0, el.scrollHeight - el.clientHeight);
+	}
+
+	function syncScrollProportion(source, target) {
+		var sMax = scrollMax(source);
+		var tMax = scrollMax(target);
+		target.scrollTop = sMax <= 0 || tMax <= 0 ? 0 : (source.scrollTop / sMax) * tMax;
+	}
+
+	function syncEditorToPreview() {
+		var ta = $editor && $editor[0];
+		var out = document.getElementById('output');
+		if (!ta || !out) return;
+		if (!scrollMapReady) {
+			syncScrollProportion(ta, out);
+			return;
+		}
+		var line = lineFracFromEditorScroll(ta.scrollTop);
+		var block = findBlockForLine(out, line);
+		if (!block) return;
+		var s = parseInt(block.getAttribute('data-line-start'), 10) || 1;
+		var e = parseInt(block.getAttribute('data-line-end'), 10) || s;
+		var span = Math.max(1, e - s + 1);
+		var progress = Math.min(1, Math.max(0, (line - s) / span));
+		var top = blockOffsetTop(block, out);
+		out.scrollTop = top + progress * block.offsetHeight;
+	}
+
+	function syncPreviewToEditor() {
+		var ta = $editor && $editor[0];
+		var out = document.getElementById('output');
+		if (!ta || !out) return;
+		if (!scrollMapReady) {
+			syncScrollProportion(out, ta);
+			return;
+		}
+		var block = findBlockAtScroll(out, out.scrollTop);
+		if (!block) return;
+		var s = parseInt(block.getAttribute('data-line-start'), 10) || 1;
+		var e = parseInt(block.getAttribute('data-line-end'), 10) || s;
+		var top = blockOffsetTop(block, out);
+		var h = Math.max(1, block.offsetHeight);
+		var progress = Math.min(1, Math.max(0, (out.scrollTop - top) / h));
+		scrollEditorToLineFrac(s + progress * (e - s + 1));
+	}
+
+	function refreshScrollMaps() {
+		if (!scrollSyncOn || !$editor || !$editor.length) {
+			scrollMapReady = false;
+			editorLineYs = null;
+			return;
+		}
+		var src = $editor.val();
+		var okAnnotate = annotatePreviewBlocks(src);
+		rebuildEditorLineYs();
+		scrollMapReady = okAnnotate && !!editorLineYs;
+	}
+
+	function onScrollSyncScroll(fromEditor) {
+		if (!scrollSyncOn || syncingScroll) return;
+		syncingScroll = true;
+		if (fromEditor) syncEditorToPreview();
+		else syncPreviewToEditor();
+		requestAnimationFrame(function () {
+			syncingScroll = false;
+		});
+	}
+
+	function setScrollSync(on) {
+		scrollSyncOn = !!on;
+		$('#scroll-sync-toggle').prop('checked', scrollSyncOn);
+		$('#scroll-sync-toggle').closest('label')
+			.attr('title', scrollSyncOn ? 'Sync scroll on' : 'Sync scroll off')
+			.toggleClass('btn-active', scrollSyncOn);
+		storageSet(SCROLL_SYNC_KEY, scrollSyncOn ? '1' : '0');
+		if (scrollSyncOn) {
+			refreshScrollMaps();
+		} else {
+			scrollMapReady = false;
+			editorLineYs = null;
+			if ($scrollMirror) $scrollMirror.empty();
+		}
+	}
+
+	function initScrollSync() {
+		setScrollSync(storageGet(SCROLL_SYNC_KEY, '0') === '1');
 	}
 
 	function isMobile() {
@@ -688,6 +1000,21 @@
 		]).map(function (d) { return d.id; }).join('') === 'bac', 'pinned first');
 		ok(wrapSelection('hi', '**', '**') === '**hi**', 'wrap selection');
 		ok(prefixLines('a\nb', '- ') === '- a\n- b', 'prefix lines');
+		ok(escapeHtml('<?php $t->id()') === '&lt;?php $t-&gt;id()', 'escape php fence');
+		ok(parseMarkdown('```php\n<?php\n$table->id();\n```').indexOf('&lt;?php') !== -1, 'php fence stays text');
+		ok(parseMarkdown('```php\n<?php\n$table->id();\n```').indexOf('language-php"><code') === -1, 'php fence no nest leak');
+		(function () {
+			var el = document.createElement('code');
+			el.textContent = "'این سند خرید' and $x";
+			enhanceCodeBidi(el);
+			var bdi = el.querySelector('bdi.code-bidi');
+			ok(!!bdi && bdi.textContent === 'این سند خرید', 'code bidi wraps Persian run');
+			ok(el.textContent.indexOf('$x') !== -1, 'code bidi keeps Latin token');
+		})();
+		ok(storageGet(SCROLL_SYNC_KEY, '0') === '0' || storageGet(SCROLL_SYNC_KEY, '0') === '1', 'scroll sync pref');
+		ok(typeof setScrollSync === 'function' && scrollSyncOn === (storageGet(SCROLL_SYNC_KEY, '0') === '1'), 'scroll sync default wiring');
+		var ranges = sourceBlockRanges('# Title\n\nHello\n');
+		ok(ranges.length === 2 && ranges[0].start === 1 && ranges[1].start === 3, 'scroll sync block ranges');
 		if (fails.length) {
 			console.error('[rtlmd selfcheck] FAIL', fails);
 			window.alert('Self-check failed: ' + fails.join(', '));
@@ -705,11 +1032,13 @@
 			$('#output').html(parseMarkdown($editor.val()));
 		} catch (err) {
 			$('#output').html('<p class="render-error">Markdown render error</p>');
+			scrollMapReady = false;
 			return;
 		}
 		highlightCode();
 		attachCodeCopyButtons();
 		renderMermaid();
+		refreshScrollMaps();
 	}
 
 	function attachCodeCopyButtons() {
@@ -933,10 +1262,11 @@
 			'.markdown-body blockquote{margin:0 0 1em;padding:.45em 0 .45em 1.1em;border-inline-start:4px solid #93c5fd;opacity:.95;page-break-inside:avoid;break-inside:avoid}',
 			'.markdown-body hr{border:none;border-top:1px solid #e4e4e7;margin:1.75em 0}',
 			'.markdown-body img{max-width:100%;height:auto;border-radius:.35rem;page-break-inside:avoid;break-inside:avoid}',
-			'.markdown-body code:not(pre code){direction:ltr;unicode-bidi:isolate;font-family:"Fira Code",Consolas,monospace;font-size:.88em;padding:.15em .45em;border-radius:.3em;color:#3f3f46;background:#f4f4f5;border:1px solid #d4d4d8}',
+			'.markdown-body code:not(pre code){direction:ltr;unicode-bidi:isolate;font-family:"Fira Code",Vazirmatn,Consolas,monospace;font-size:.88em;padding:.15em .45em;border-radius:.3em;color:#3f3f46;background:#f4f4f5;border:1px solid #d4d4d8}',
 			'.markdown-body pre.code-block{direction:ltr;unicode-bidi:isolate;text-align:left;position:relative;margin:.65em 0 1em;padding:0;border-radius:.45rem;overflow:hidden;border:1px solid #334155;background:#1e293b!important;box-shadow:none;line-height:1.6;page-break-inside:avoid;break-inside:avoid}',
 			'.markdown-body pre.code-block .code-lang{position:absolute;top:0;inset-inline-end:0;z-index:1;padding:.3em .75em;font-family:"Fira Code",Consolas,monospace;font-size:.62em;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;background:rgba(0,0,0,.35);border-end-start-radius:.3rem}',
-			'.markdown-body pre.code-block code{direction:ltr;display:block;font-family:"Fira Code",Consolas,monospace;font-size:' + (forPrint ? '8.5pt' : '.875em') + ';line-height:1.6;color:#e2e8f0!important;background:#1e293b!important;padding:1.1em 1.2em;white-space:' + (forPrint ? 'pre-wrap' : 'pre') + ';overflow-x:' + (forPrint ? 'visible' : 'auto') + ';tab-size:2;word-break:break-word}',
+			'.markdown-body pre.code-block code{direction:ltr;unicode-bidi:isolate;display:block;font-family:"Fira Code",Vazirmatn,Consolas,monospace;font-size:' + (forPrint ? '8.5pt' : '.875em') + ';line-height:1.6;color:#e2e8f0!important;background:#1e293b!important;padding:1.1em 1.2em;white-space:' + (forPrint ? 'pre-wrap' : 'pre') + ';overflow-x:' + (forPrint ? 'visible' : 'auto') + ';tab-size:2;word-break:break-word}',
+			'.markdown-body pre.code-block code .code-bidi{font-family:Vazirmatn,Tahoma,sans-serif;font-style:normal}',
 			'.markdown-body .mermaid-wrap{direction:ltr;unicode-bidi:isolate;margin:0 0 1em;padding:1em .75em;overflow:hidden;border:1px solid #cbd5e1;border-radius:.45rem;background:#f8fafc;text-align:center;page-break-inside:avoid;break-inside:avoid}',
 			'.markdown-body pre.mermaid{margin:0;padding:0;background:transparent;border:none;box-shadow:none;text-align:center;white-space:pre-wrap}',
 			'.markdown-body .mermaid-wrap svg{max-width:100%!important;height:auto!important}',
@@ -1154,6 +1484,15 @@
 		$editor.on('input', onEditorChange);
 		$editor.on('compositionend', onEditorChange);
 		$editor.on('keyup paste cut', onEditorChange);
+		$editor.on('scroll', function () {
+			onScrollSyncScroll(true);
+		});
+		$('#output').on('scroll', function () {
+			onScrollSyncScroll(false);
+		});
+		$(window).on('resize', debounce(function () {
+			if (scrollSyncOn) rebuildEditorLineYs();
+		}, 150));
 		$editor.on('keydown', function (e) {
 			if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
 			var key = e.key.toLowerCase();
@@ -1199,6 +1538,7 @@
 		initDirection();
 		initFontSize();
 		initFullview();
+		initScrollSync();
 		initSidebar();
 		initMobileView();
 		bindDocsUi();
@@ -1221,6 +1561,10 @@
 
 		$('#fullview-toggle').on('change', function () {
 			setFullview(this.checked);
+		});
+
+		$('#scroll-sync-toggle').on('change', function () {
+			setScrollSync(this.checked);
 		});
 
 		$('[data-export]').on('click', function () {
