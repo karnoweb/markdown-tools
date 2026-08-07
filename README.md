@@ -5,10 +5,12 @@ RTL Markdown editor with live preview — built for [karnoweb.ir](https://karnow
 ## Features
 
 - Pro layout: slim header + file history sidebar + editor/preview
-- Local document history in `localStorage` (create, open, rename, delete)
+- Local document history in `localStorage` (create, open, rename, lock, delete)
+- Locked documents cannot be deleted until unlocked
+- Markdown formatting toolbar (bold, italic, headings, lists, code, links)
 - Side-by-side edit and preview (RTL / LTR)
 - Karnoweb brand themes (Pro Dark / Pro Light)
-- Code highlighting (Prism) and diagrams (Mermaid)
+- Code highlighting (Prism), copyable code blocks, and diagrams (Mermaid)
 - Export: HTML, Markdown, PDF, image (PNG)
 
 ## Shortcuts
