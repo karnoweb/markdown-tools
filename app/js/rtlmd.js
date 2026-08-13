@@ -772,6 +772,11 @@
 		});
 	}
 
+	function shouldAutoTitle(doc, opts) {
+		opts = opts || {};
+		return !opts.keepTitle && !doc.titleLocked;
+	}
+
 	function persistActiveFromEditor(opts) {
 		opts = opts || {};
 		if (!$editor || !$editor.length || !docsState.activeId) return;
@@ -780,7 +785,7 @@
 		var content = $editor.val();
 		doc.content = content;
 		doc.updatedAt = Date.now();
-		if (!opts.keepTitle) {
+		if (shouldAutoTitle(doc, opts)) {
 			doc.title = titleFromContent(content);
 		}
 		writeDocs(docsState.items);
@@ -853,6 +858,7 @@
 		next = String(next).trim().slice(0, 80);
 		if (!next) next = UNTITLED;
 		doc.title = next;
+		doc.titleLocked = true;
 		writeDocs(docsState.items);
 		if (doc.id === docsState.activeId) updateActiveTitleUi(doc.title);
 		renderDocList();
@@ -987,6 +993,8 @@
 		ok(titleFromContent('# Hello world\n\nx') === 'Hello world', 'heading title');
 		ok(titleFromContent('   ') === UNTITLED, 'empty title');
 		ok(titleFromContent('First line\nsecond') === 'First line', 'first line title');
+		ok(!shouldAutoTitle({ titleLocked: true }, {}), 'locked title skips auto');
+		ok(shouldAutoTitle({}, {}), 'unlocked title still auto');
 		ok(!!uid() && uid() !== uid(), 'uid uniqueness');
 		ok(slugifyFilename('a/b:c').indexOf('/') === -1, 'slugify');
 		ok(sortDocs([
