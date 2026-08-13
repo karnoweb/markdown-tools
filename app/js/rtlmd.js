@@ -123,7 +123,8 @@
 	};
 
 	renderer.codespan = function (code) {
-		return '<code dir="ltr" class="codespan">' + escapeHtml(code) + '</code>';
+		/* marked already HTML-escapes codespan text — don't escapeHtml again */
+		return '<code dir="ltr" class="codespan">' + code + '</code>';
 	};
 
 	renderer.link = function (href, title, text) {
@@ -1003,6 +1004,8 @@
 		ok(escapeHtml('<?php $t->id()') === '&lt;?php $t-&gt;id()', 'escape php fence');
 		ok(parseMarkdown('```php\n<?php\n$table->id();\n```').indexOf('&lt;?php') !== -1, 'php fence stays text');
 		ok(parseMarkdown('```php\n<?php\n$table->id();\n```').indexOf('language-php"><code') === -1, 'php fence no nest leak');
+		ok(parseMarkdown("x `'y'` z").indexOf('&amp;#39;') === -1, 'codespan no double-escape');
+		ok(parseMarkdown("x `'y'` z").indexOf("&#39;y&#39;") !== -1, 'codespan keeps quotes');
 		(function () {
 			var el = document.createElement('code');
 			el.textContent = "'این سند خرید' and $x";
