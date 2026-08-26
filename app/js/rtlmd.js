@@ -17,6 +17,8 @@
 	var UNTITLED = 'Untitled';
 	var MOBILE_MQ = '(max-width: 768px)';
 
+	var pendingExternalFiles = [];
+
 	var DARK_THEMES = {
 		dark: 1, night: 1, dracula: 1, dim: 1, nord: 1, sunset: 1,
 		forest: 1, luxury: 1, coffee: 1, business: 1, halloween: 1,
@@ -24,8 +26,10 @@
 		'karnoweb-dark': 1
 	};
 
-	var PRISM_THEME_DARK = 'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css';
-	var PRISM_THEME_LIGHT = 'https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism.min.css';
+	var VENDOR = 'assets/vendor/';
+	var PRISM = VENDOR + 'prism/';
+	var PRISM_THEME_DARK = PRISM + 'themes/prism-tomorrow.min.css';
+	var PRISM_THEME_LIGHT = PRISM + 'themes/prism.min.css';
 
 	var LANG_ALIASES = {
 		js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash',
@@ -94,7 +98,8 @@
 	};
 
 	renderer.table = function (header, body) {
-		return '<table' + dirAttr() + '><thead>' + header + '</thead><tbody>' + body + '</tbody></table>';
+		return '<div class="table-scroll" tabindex="0" role="region" aria-label="Table">' +
+			'<table' + dirAttr() + '><thead>' + header + '</thead><tbody>' + body + '</tbody></table></div>';
 	};
 
 	renderer.tablerow = function (content) {
@@ -259,11 +264,191 @@
 				fontFamily: 'Vazirmatn, Tahoma, sans-serif'
 			});
 			mermaid.run({ nodes: nodes }).then(function () {
+				enhanceMermaidDiagrams();
 				if (scrollSyncOn) refreshScrollMaps();
 			}).catch(function () {
 				/* ponytail: bad diagram syntax — source stays visible in pre */
 			});
 		} catch (e) { /* ponytail: mermaid unavailable */ }
+	}
+
+	function enhanceMermaidDiagrams() {
+		document.querySelectorAll('#output .mermaid-wrap').forEach(function (wrap) {
+			if (wrap.dataset.mermaidEnhanced === '1') return;
+			var svg = wrap.querySelector('svg');
+			if (!svg) return;
+			wrap.dataset.mermaidEnhanced = '1';
+
+			var toolbar = document.createElement('div');
+			toolbar.className = 'mermaid-toolbar';
+			toolbar.setAttribute('role', 'toolbar');
+			toolbar.setAttribute('aria-label', 'Diagram zoom');
+			toolbar.innerHTML =
+				'<button type="button" class="mermaid-zoom-btn" data-action="out" title="Zoom out" aria-label="Zoom out">−</button>' +
+				'<button type="button" class="mermaid-zoom-btn mermaid-zoom-btn--label" data-action="reset" title="Reset zoom" aria-label="Reset zoom">100%</button>' +
+				'<button type="button" class="mermaid-zoom-btn" data-action="in" title="Zoom in" aria-label="Zoom in">+</button>' +
+				'<button type="button" class="mermaid-zoom-btn" data-action="fit" title="Fit width" aria-label="Fit width">Fit</button>' +
+				'<button type="button" class="mermaid-zoom-btn" data-action="full" title="Fullscreen" aria-label="Fullscreen">⛶</button>';
+
+			var viewport = document.createElement('div');
+			viewport.className = 'mermaid-viewport';
+			var stage = document.createElement('div');
+			stage.className = 'mermaid-stage';
+
+			wrap.insertBefore(toolbar, svg);
+			wrap.insertBefore(viewport, svg);
+			stage.appendChild(svg);
+			viewport.appendChild(stage);
+
+			var scale = 1;
+			var minScale = 0.2;
+			var maxScale = 5;
+			var pinchStart = 0;
+
+			function labelBtn() {
+				return toolbar.querySelector('[data-action="reset"]');
+			}
+
+			function applyScale(next, origin) {
+				scale = Math.min(maxScale, Math.max(minScale, next));
+				stage.style.transform = 'scale(' + scale + ')';
+				var btn = labelBtn();
+				if (btn) btn.textContent = Math.round(scale * 100) + '%';
+				if (origin) stage.style.transformOrigin = origin;
+			}
+
+			function fitWidth() {
+				var vw = Math.max(viewport.clientWidth - 8, 1);
+				var rect = svg.getBoundingClientRect();
+				var baseWidth = rect.width / scale;
+				if (baseWidth > 0) applyScale(Math.min(1, vw / baseWidth), 'top center');
+			}
+
+			toolbar.addEventListener('click', function (e) {
+				var btn = e.target.closest('[data-action]');
+				if (!btn) return;
+				var action = btn.getAttribute('data-action');
+				if (action === 'in') applyScale(scale * 1.2, 'top center');
+				if (action === 'out') applyScale(scale / 1.2, 'top center');
+				if (action === 'reset') applyScale(1, 'top center');
+				if (action === 'fit') fitWidth();
+				if (action === 'full') openMermaidFullscreen(wrap, stage, toolbar, applyScale, fitWidth, function () { return scale; });
+			});
+
+			viewport.addEventListener('wheel', function (e) {
+				if (!e.ctrlKey && !e.metaKey) return;
+				e.preventDefault();
+				applyScale(scale * (e.deltaY < 0 ? 1.12 : 1 / 1.12), 'top center');
+			}, { passive: false });
+
+			viewport.addEventListener('touchstart', function (e) {
+				if (e.touches.length === 2) pinchStart = pinchDistance(e.touches);
+			}, { passive: true });
+
+			viewport.addEventListener('touchmove', function (e) {
+				if (e.touches.length !== 2 || !pinchStart) return;
+				e.preventDefault();
+				var dist = pinchDistance(e.touches);
+				applyScale(scale * (dist / pinchStart), 'top center');
+				pinchStart = dist;
+			}, { passive: false });
+
+			viewport.addEventListener('touchend', function () {
+				pinchStart = 0;
+			});
+
+			if (window.matchMedia('(max-width: 768px)').matches) {
+				requestAnimationFrame(fitWidth);
+			}
+		});
+	}
+
+	function pinchDistance(touches) {
+		var dx = touches[0].clientX - touches[1].clientX;
+		var dy = touches[0].clientY - touches[1].clientY;
+		return Math.hypot(dx, dy);
+	}
+
+	function openMermaidFullscreen(wrap, stage, toolbar, applyScale, fitWidth, getScale) {
+		var overlay = document.createElement('div');
+		overlay.className = 'mermaid-fullscreen';
+		overlay.setAttribute('role', 'dialog');
+		overlay.setAttribute('aria-modal', 'true');
+		overlay.setAttribute('aria-label', 'Diagram preview');
+
+		var panel = document.createElement('div');
+		panel.className = 'mermaid-fullscreen-panel';
+
+		var head = document.createElement('div');
+		head.className = 'mermaid-fullscreen-head';
+		head.innerHTML = '<span>Diagram</span>';
+
+		var closeBtn = document.createElement('button');
+		closeBtn.type = 'button';
+		closeBtn.className = 'mermaid-zoom-btn';
+		closeBtn.textContent = '✕';
+		closeBtn.setAttribute('aria-label', 'Close');
+		closeBtn.addEventListener('click', close);
+		head.appendChild(closeBtn);
+
+		var cloneToolbar = toolbar.cloneNode(true);
+		var cloneViewport = document.createElement('div');
+		cloneViewport.className = 'mermaid-viewport mermaid-viewport--full';
+		var cloneStage = stage.cloneNode(true);
+		cloneStage.style.transform = stage.style.transform || 'scale(1)';
+		cloneViewport.appendChild(cloneStage);
+
+		var fsScale = getScale();
+		function fsApply(next) {
+			fsScale = Math.min(5, Math.max(0.2, next));
+			cloneStage.style.transform = 'scale(' + fsScale + ')';
+			var reset = cloneToolbar.querySelector('[data-action="reset"]');
+			if (reset) reset.textContent = Math.round(fsScale * 100) + '%';
+		}
+
+		cloneToolbar.addEventListener('click', function (e) {
+			var btn = e.target.closest('[data-action]');
+			if (!btn) return;
+			var action = btn.getAttribute('data-action');
+			if (action === 'in') fsApply(fsScale * 1.2);
+			if (action === 'out') fsApply(fsScale / 1.2);
+			if (action === 'reset') fsApply(1);
+			if (action === 'fit') {
+				var svg = cloneStage.querySelector('svg');
+				if (!svg) return;
+				var vw = Math.max(cloneViewport.clientWidth - 8, 1);
+				var base = svg.getBoundingClientRect().width / fsScale;
+				if (base > 0) fsApply(Math.min(1, vw / base));
+			}
+			if (action === 'full') close();
+		});
+
+		panel.appendChild(head);
+		panel.appendChild(cloneToolbar);
+		panel.appendChild(cloneViewport);
+		overlay.appendChild(panel);
+		document.body.appendChild(overlay);
+		document.body.classList.add('mermaid-fullscreen-open');
+
+		function close() {
+			overlay.remove();
+			document.body.classList.remove('mermaid-fullscreen-open');
+			document.removeEventListener('keydown', onKey);
+		}
+
+		function onKey(e) {
+			if (e.key === 'Escape') close();
+		}
+
+		document.addEventListener('keydown', onKey);
+		overlay.addEventListener('click', function (e) {
+			if (e.target === overlay) close();
+		});
+
+		requestAnimationFrame(function () {
+			var fitBtn = cloneToolbar.querySelector('[data-action="fit"]');
+			if (fitBtn) fitBtn.click();
+		});
 	}
 
 	function applyTheme(pref) {
@@ -636,6 +821,82 @@
 	/* ── Document history (localStorage) ───────────────── */
 	var docsState = { items: [], activeId: null };
 
+	function normalizeSourcePath(sourcePath) {
+		if (!sourcePath) return '';
+		return String(sourcePath).replace(/\\/g, '/').toLowerCase();
+	}
+
+	function findDocBySourcePath(sourcePath) {
+		var wanted = normalizeSourcePath(sourcePath);
+		if (!wanted) return null;
+		for (var i = 0; i < docsState.items.length; i++) {
+			var doc = docsState.items[i];
+			if (doc.sourcePath && normalizeSourcePath(doc.sourcePath) === wanted) {
+				return doc;
+			}
+		}
+		return null;
+	}
+
+	function isBlankStarterDoc(doc) {
+		if (!doc || doc.sourcePath) return false;
+		var content = String(doc.content || '').trim();
+		if (!content) return true;
+		if (content === '# Markdown Tools\n\nStart writing…') return true;
+		return doc.title === UNTITLED && content.length < 48;
+	}
+
+	function openExternalMarkdownFile(payload) {
+		if (!payload || typeof payload.content !== 'string') return;
+
+		var existing = findDocBySourcePath(payload.path);
+		if (existing) {
+			persistActiveFromEditor({ silentList: true });
+			existing.content = payload.content;
+			markDocSavedToDisk(existing, payload.content);
+			existing.updatedAt = Date.now();
+			writeDocs(docsState.items);
+			loadDocIntoEditor(existing);
+			return;
+		}
+
+		persistActiveFromEditor({ silentList: true });
+
+		if (docsState.items.length === 1 && isBlankStarterDoc(docsState.items[0])) {
+			var starter = docsState.items[0];
+			starter.content = payload.content;
+			starter.title = payload.name || titleFromContent(payload.content) || UNTITLED;
+			starter.titleLocked = true;
+			starter.sourcePath = payload.path;
+			markDocSavedToDisk(starter, payload.content);
+			starter.updatedAt = Date.now();
+			writeDocs(docsState.items);
+			loadDocIntoEditor(starter);
+			return;
+		}
+
+		createDoc(payload.content, payload.name || titleFromContent(payload.content), {
+			sourcePath: payload.path,
+			titleLocked: true
+		});
+	}
+
+	function flushPendingExternalFiles() {
+		while (pendingExternalFiles.length) {
+			openExternalMarkdownFile(pendingExternalFiles.shift());
+		}
+	}
+
+	function initDesktopBridge() {
+		if (!window.rtlmdDesktop || typeof window.rtlmdDesktop.onOpenFile !== 'function') return;
+		window.rtlmdDesktop.onOpenFile(function (payload) {
+			pendingExternalFiles.push(payload);
+			if (docsState.items.length) {
+				flushPendingExternalFiles();
+			}
+		});
+	}
+
 	function uid() {
 		return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 	}
@@ -716,11 +977,66 @@
 		}
 	}
 
-	function updateActiveTitleUi(title) {
+	function isActiveDocDiskDirty() {
+		var doc = findDoc(docsState.activeId);
+		if (!doc || !doc.sourcePath) return false;
+		var content = $editor && $editor.length ? $editor.val() : doc.content;
+		return content !== doc.lastSavedToDisk;
+	}
+
+	function isDocDiskDirty(doc) {
+		if (!doc || !doc.sourcePath) return false;
+		return doc.content !== doc.lastSavedToDisk;
+	}
+
+	function markDocSavedToDisk(doc, content) {
+		if (!doc) return;
+		doc.lastSavedToDisk = content;
+	}
+
+	function refreshActiveTitleUi(flash) {
+		var doc = findDoc(docsState.activeId);
 		var el = document.getElementById('active-doc-title');
-		if (!el) return;
-		el.textContent = title || '';
-		el.title = title || '';
+		if (!el || !doc) return;
+		var title = doc.title || UNTITLED;
+		var dirty = isActiveDocDiskDirty();
+		el.textContent = dirty ? title + ' ●' : title;
+		el.title = doc.sourcePath || title;
+		el.classList.toggle('is-dirty', dirty);
+		if (flash === 'saved') {
+			el.classList.add('is-saved-flash');
+			clearTimeout(refreshActiveTitleUi._flashTimer);
+			refreshActiveTitleUi._flashTimer = setTimeout(function () {
+				el.classList.remove('is-saved-flash');
+			}, 1400);
+		}
+	}
+
+	function updateActiveTitleUi(/* title */) {
+		refreshActiveTitleUi();
+	}
+
+	function saveActiveDocToDisk() {
+		if (!window.rtlmdDesktop || typeof window.rtlmdDesktop.saveFile !== 'function') {
+			return Promise.resolve(false);
+		}
+		var doc = findDoc(docsState.activeId);
+		if (!doc || !doc.sourcePath) return Promise.resolve(false);
+
+		var content = $editor && $editor.length ? $editor.val() : doc.content;
+		return window.rtlmdDesktop.saveFile(doc.sourcePath, content).then(function () {
+			doc.content = content;
+			markDocSavedToDisk(doc, content);
+			doc.updatedAt = Date.now();
+			writeDocs(docsState.items);
+			storageSet(STORAGE_KEY, content);
+			refreshActiveTitleUi('saved');
+			renderDocList();
+			return true;
+		}).catch(function (err) {
+			window.alert('Could not save file:\n' + (err && err.message ? err.message : String(err)));
+			return false;
+		});
 	}
 
 	function renderDocList() {
@@ -740,9 +1056,11 @@
 			$li.attr('data-id', doc.id);
 
 			var $open = $('<button type="button" class="doc-open"></button>');
-			$open.append($('<span class="doc-title"></span>').text(doc.title || UNTITLED));
+			var listTitle = doc.title || UNTITLED;
+			if (isDocDiskDirty(doc)) listTitle += ' ●';
+			$open.append($('<span class="doc-title"></span>').text(listTitle));
 			$open.append($('<span class="doc-meta"></span>').text(formatDocTime(doc.createdAt || doc.updatedAt)));
-			$open.attr('title', doc.title || UNTITLED);
+			$open.attr('title', doc.sourcePath || doc.title || UNTITLED);
 
 			var lockSvg = doc.pinned
 				? '<svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>'
@@ -807,7 +1125,8 @@
 		renderDocList();
 	}
 
-	function createDoc(content, title) {
+	function createDoc(content, title, opts) {
+		opts = opts || {};
 		persistActiveFromEditor({ silentList: true });
 		var items = docsState.items.slice();
 		if (items.length >= MAX_DOCS) {
@@ -833,6 +1152,9 @@
 			updatedAt: now,
 			createdAt: now
 		};
+		if (opts.sourcePath) doc.sourcePath = opts.sourcePath;
+		if (opts.titleLocked) doc.titleLocked = true;
+		if (opts.sourcePath) markDocSavedToDisk(doc, doc.content);
 		items.unshift(doc);
 		writeDocs(items);
 		loadDocIntoEditor(doc);
@@ -917,9 +1239,17 @@
 					title: d.title || titleFromContent(d.content) || UNTITLED,
 					content: typeof d.content === 'string' ? d.content : '',
 					pinned: !!d.pinned,
+					sourcePath: d.sourcePath || null,
+					titleLocked: !!d.titleLocked,
+					lastSavedToDisk: typeof d.lastSavedToDisk === 'string' ? d.lastSavedToDisk : null,
 					updatedAt: d.updatedAt || Date.now(),
 					createdAt: d.createdAt || d.updatedAt || Date.now()
 				};
+			});
+			docsState.items.forEach(function (doc) {
+				if (doc.sourcePath && doc.lastSavedToDisk === null) {
+					markDocSavedToDisk(doc, doc.content);
+				}
 			});
 			writeDocs(docsState.items);
 			var wanted = storageGet(ACTIVE_ID_KEY, null);
@@ -1251,8 +1581,8 @@
 	/* ponytail: standalone export CSS — mirrors preview styles without daisyui */
 	function exportStylesheet(forPrint) {
 		return [
-			'@import url("https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css");',
-			'@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap");',
+			'@font-face{font-family:Vazirmatn;src:local("Vazirmatn"),local("Tahoma");font-weight:400;font-style:normal}',
+			'@font-face{font-family:"Fira Code";src:local("Fira Code"),local(Consolas);font-weight:400;font-style:normal}',
 			forPrint ? '@page{size:A4;margin:1.4cm 1.2cm}' : '',
 			'*{box-sizing:border-box}',
 			'html,body{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}',
@@ -1281,6 +1611,8 @@
 			'.markdown-body .mermaid-wrap{direction:ltr;unicode-bidi:isolate;margin:0 0 1em;padding:1em .75em;overflow:hidden;border:1px solid #cbd5e1;border-radius:.45rem;background:#f8fafc;text-align:center;page-break-inside:avoid;break-inside:avoid}',
 			'.markdown-body pre.mermaid{margin:0;padding:0;background:transparent;border:none;box-shadow:none;text-align:center;white-space:pre-wrap}',
 			'.markdown-body .mermaid-wrap svg{max-width:100%!important;height:auto!important}',
+			'.markdown-body .table-scroll{overflow-x:auto;margin:0 0 1em;border:1px solid #cbd5e1;border-radius:.35rem}',
+			'.markdown-body .table-scroll table{width:max-content;min-width:100%;margin:0;border:none}',
 			'.markdown-body table{width:100%;margin:0 0 1em;border-collapse:collapse;font-size:.92em;border:1.5px solid #cbd5e1;background:#fff;page-break-inside:auto}',
 			'.markdown-body tr{page-break-inside:avoid;break-inside:avoid}',
 			'.markdown-body th,.markdown-body td{padding:.55em .8em;border:1px solid #cbd5e1;text-align:start;vertical-align:top}',
@@ -1308,22 +1640,22 @@
 
 	function exportHeadAssets(needsPrism) {
 		if (!needsPrism) return '';
-		return '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css">';
+		return '<link rel="stylesheet" href="' + PRISM_THEME_DARK + '">';
 	}
 
 	function exportBodyScripts(needsPrism, needsMermaid) {
 		var parts = [];
 		if (needsPrism) {
-			parts.push('<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/prism.min.js"><\/script>');
-			parts.push('<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup.min.js"><\/script>');
-			parts.push('<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-clike.min.js"><\/script>');
-			parts.push('<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-markup-templating.min.js"><\/script>');
-			parts.push('<script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"><\/script>');
-			parts.push('<script>Prism.plugins.autoloader.languages_path="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/";' +
+			parts.push('<script src="' + PRISM + 'prism.min.js"><\/script>');
+			parts.push('<script src="' + PRISM + 'components/prism-markup.min.js"><\/script>');
+			parts.push('<script src="' + PRISM + 'components/prism-clike.min.js"><\/script>');
+			parts.push('<script src="' + PRISM + 'components/prism-markup-templating.min.js"><\/script>');
+			parts.push('<script src="' + PRISM + 'plugins/autoloader/prism-autoloader.min.js"><\/script>');
+			parts.push('<script>Prism.plugins.autoloader.languages_path="' + PRISM + 'components/";' +
 				'document.querySelectorAll("pre.code-block code").forEach(function(el){try{Prism.highlightElement(el)}catch(e){}});<\/script>');
 		}
 		if (needsMermaid) {
-			parts.push('<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.min.js"><\/script>');
+			parts.push('<script src="' + VENDOR + 'mermaid/mermaid.min.js"><\/script>');
 			parts.push('<script>mermaid.initialize({startOnLoad:false,theme:"default",securityLevel:"loose",fontFamily:"Vazirmatn, Tahoma, sans-serif"});' +
 				'mermaid.run({nodes:document.querySelectorAll("pre.mermaid:not([data-processed])")}).catch(function(){});<\/script>');
 		}
@@ -1436,7 +1768,7 @@
 		var bg = window.getComputedStyle(node).backgroundColor || '#ffffff';
 
 		loadScriptOnce(
-			'https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js',
+			VENDOR + 'html-to-image/html-to-image.js',
 			'htmlToImage'
 		).then(function () {
 			if (!window.htmlToImage || !window.htmlToImage.toPng) {
@@ -1453,7 +1785,7 @@
 			var name = slugifyFilename(findDoc(docsState.activeId) && findDoc(docsState.activeId).title) + '.png';
 			downloadDataUrl(dataUrl, name);
 		}).catch(function () {
-			window.alert('Image export failed. Check your connection and try again.');
+			window.alert('Image export failed. Try again.');
 		}).then(function () {
 			node.style.height = prev.height;
 			node.style.maxHeight = prev.maxHeight;
@@ -1488,6 +1820,7 @@
 			});
 		}
 		scheduleSave();
+		refreshActiveTitleUi();
 	}
 
 	function bindEditorEvents() {
@@ -1525,21 +1858,31 @@
 		var existing = readDocsRaw();
 		if (existing && existing.length) {
 			ensureDocsBootstrapped();
+			flushPendingExternalFiles();
 			return;
 		}
 
 		var legacy = storageGet(STORAGE_KEY, null) || storageGet('content', null);
 		if (legacy !== null && legacy !== '') {
 			ensureDocsBootstrapped();
+			flushPendingExternalFiles();
+			return;
+		}
+
+		if (pendingExternalFiles.length) {
+			ensureDocsBootstrapped('');
+			flushPendingExternalFiles();
 			return;
 		}
 
 		$.get(INIT_URL)
 			.done(function (data) {
 				ensureDocsBootstrapped(data);
+				flushPendingExternalFiles();
 			})
 			.fail(function () {
 				ensureDocsBootstrapped('# Markdown Tools\n\nStart writing…');
+				flushPendingExternalFiles();
 			});
 	}
 
@@ -1586,6 +1929,7 @@
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
 				e.preventDefault();
 				persistActiveFromEditor();
+				saveActiveDocToDisk();
 				return;
 			}
 			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n' && !e.shiftKey) {
@@ -1608,9 +1952,64 @@
 		}
 	}
 
+	function isDesktopShell() {
+		return /Electron\//.test(navigator.userAgent);
+	}
+
+	function isStandalonePwa() {
+		return window.matchMedia('(display-mode: standalone)').matches ||
+			window.matchMedia('(display-mode: window-controls-overlay)').matches ||
+			!!window.navigator.standalone;
+	}
+
+	function initPwaInstall() {
+		if (isDesktopShell() || isStandalonePwa()) return;
+
+		var btn = document.getElementById('pwa-install');
+		if (!btn) return;
+
+		var deferredInstall = null;
+
+		window.addEventListener('beforeinstallprompt', function (e) {
+			e.preventDefault();
+			deferredInstall = e;
+			btn.classList.remove('hidden');
+		});
+
+		btn.addEventListener('click', function () {
+			if (!deferredInstall) {
+				window.alert('Install from the browser menu:\nChrome/Edge → Install Markdown Tools\n(or ⋮ → Apps → Install this site as an app)');
+				return;
+			}
+			deferredInstall.prompt();
+			deferredInstall.userChoice.then(function () {
+				deferredInstall = null;
+				btn.classList.add('hidden');
+			});
+		});
+
+		window.addEventListener('appinstalled', function () {
+			deferredInstall = null;
+			btn.classList.add('hidden');
+		});
+	}
+
+	function registerServiceWorker() {
+		if (isDesktopShell()) return;
+		if (!('serviceWorker' in navigator)) return;
+		window.addEventListener('load', function () {
+			navigator.serviceWorker.register('sw.js').catch(function () {
+				/* ponytail: SW needs http(s) — file:// and some hosts skip registration */
+			});
+		});
+	}
+
 	$(document).ready(function () {
 		bindEditorEvents();
 		initUI();
+		initDesktopBridge();
 		loadInitialContent();
+		initPwaInstall();
+		registerServiceWorker();
 	});
 }());

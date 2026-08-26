@@ -8,7 +8,9 @@ pids
 *.seed
 
 # Dependencies / IDE
-node_modules
+node_modules/
+dist/
+.build/
 .idea
 .vscode
 .DS_Store

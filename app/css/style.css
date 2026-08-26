@@ -1,5 +1,4 @@
-@import url("https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css");
-@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap");
+@import url("../../assets/vendor/fonts/fonts.css");
 
 :root {
   --rtlmd-font: 'Vazirmatn', 'Droid Arabic Naskh', 'Tahoma', sans-serif;
@@ -595,6 +594,15 @@ html.sidebar-collapsed .sidebar {
   letter-spacing: 0;
 }
 
+.pane-doc-title.is-dirty {
+  opacity: 0.95;
+}
+
+.pane-doc-title.is-saved-flash {
+  opacity: 1;
+  color: oklch(var(--su));
+}
+
 .pane-header--preview {
   display: flex;
   align-items: center;
@@ -1008,13 +1016,70 @@ body.fullview #output {
 .markdown-body .mermaid-wrap {
   direction: ltr;
   unicode-bidi: isolate;
+  position: relative;
   margin: 0 0 var(--rtlmd-paragraph-gap);
-  padding: 1.25em 1em;
-  overflow-x: auto;
+  padding: 2.35rem 0.65rem 0.85rem;
+  overflow: hidden;
   border: 1px solid var(--rtlmd-table-border);
   border-radius: 0.5rem;
   background-color: oklch(var(--b2));
   text-align: center;
+}
+
+.mermaid-toolbar {
+  position: absolute;
+  top: 0.35rem;
+  inset-inline: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  z-index: 2;
+}
+
+.mermaid-zoom-btn {
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0 0.55rem;
+  border: 1px solid oklch(var(--b3));
+  border-radius: 0.4rem;
+  background: oklch(var(--b1));
+  color: oklch(var(--bc));
+  font-family: var(--rtlmd-font);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mermaid-zoom-btn--label {
+  min-width: 3.2rem;
+}
+
+.mermaid-zoom-btn:hover,
+.mermaid-zoom-btn:focus-visible {
+  border-color: oklch(var(--p));
+  color: oklch(var(--p));
+}
+
+.mermaid-viewport {
+  overflow: auto;
+  max-width: 100%;
+  max-height: min(70vh, 36rem);
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+.mermaid-viewport--full {
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+}
+
+.mermaid-stage {
+  display: inline-block;
+  transform-origin: top center;
+  min-width: min-content;
 }
 
 .markdown-body pre.mermaid {
@@ -1031,8 +1096,85 @@ body.fullview #output {
 }
 
 .markdown-body .mermaid-wrap svg {
-  max-width: 100%;
+  display: block;
+  max-width: none;
+  width: auto;
   height: auto;
+}
+
+.markdown-body .table-scroll {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 var(--rtlmd-paragraph-gap);
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0.35rem;
+  border: 1px solid var(--rtlmd-table-border);
+  background-color: oklch(var(--b1));
+}
+
+.markdown-body .table-scroll:focus-visible {
+  outline: 2px solid oklch(var(--p));
+  outline-offset: 2px;
+}
+
+.markdown-body .table-scroll table {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  min-width: 100%;
+  width: max-content;
+}
+
+body.mermaid-fullscreen-open {
+  overflow: hidden;
+}
+
+.mermaid-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: oklch(0% 0 0 / 0.72);
+}
+
+.mermaid-fullscreen-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(96vw, 72rem);
+  height: min(92vh, 52rem);
+  border-radius: 0.75rem;
+  border: 1px solid oklch(var(--b3));
+  background: oklch(var(--b1));
+  box-shadow: 0 20px 50px oklch(0% 0 0 / 0.35);
+  overflow: hidden;
+}
+
+.mermaid-fullscreen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid oklch(var(--b3));
+  font-weight: 700;
+}
+
+.mermaid-fullscreen-panel .mermaid-toolbar {
+  position: static;
+  padding: 0.45rem 0.65rem 0;
+  justify-content: flex-end;
+}
+
+.mermaid-fullscreen-panel .mermaid-viewport {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  padding: 0.65rem;
 }
 
 .markdown-body table {
@@ -1254,6 +1396,34 @@ html[data-theme="karnoweb-dark"] {
 
   .export-actions::-webkit-scrollbar {
     display: none;
+  }
+
+  .markdown-body .table-scroll {
+    margin-inline: -0.15rem;
+  }
+
+  .markdown-body .table-scroll table {
+    font-size: 0.84em;
+  }
+
+  .markdown-body th,
+  .markdown-body td {
+    padding: 0.55em 0.7em;
+    white-space: nowrap;
+  }
+
+  .markdown-body .mermaid-viewport {
+    max-height: min(55vh, 28rem);
+  }
+
+  .mermaid-fullscreen {
+    padding: 0.35rem;
+  }
+
+  .mermaid-fullscreen-panel {
+    width: 100%;
+    height: 100%;
+    border-radius: 0.65rem;
   }
 
   .sidebar {

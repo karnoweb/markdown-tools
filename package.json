@@ -1,0 +1,108 @@
+{
+  "name": "markdown-tools",
+  "productName": "Markdown Tools",
+  "version": "1.7.0",
+  "description": "RTL Markdown editor with live preview and export",
+  "author": "karnoweb",
+  "license": "MIT",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "build:css": "tailwindcss -i app/css/tailwind-src.css -o assets/vendor/tailwind.css --minify",
+    "icons": "node scripts/generate-icons.mjs",
+    "vendor:copy": "node scripts/vendor-copy.mjs",
+    "vendor": "npm run vendor:copy && npm run build:css && npm run icons",
+    "start": "electron .",
+    "pack": "npm run vendor && electron-builder --dir",
+    "dist": "npm run vendor && electron-builder",
+    "clean:win": "node scripts/clean-win-build.mjs",
+    "pack:win": "node scripts/clean-win-build.mjs && electron-builder --win --dir -c.directories.output=.build/electron",
+    "patch:win": "node scripts/patch-win-exe.mjs",
+    "dist:win": "npm run vendor && npm run pack:win && npm run patch:win && electron-builder --win nsis portable --prepackaged .build/electron/win-unpacked",
+    "dist:linux": "npm run vendor && electron-builder --linux",
+    "dist:mac": "npm run vendor && electron-builder --mac"
+  },
+  "devDependencies": {
+    "daisyui": "4.12.24",
+    "electron": "35.1.5",
+    "electron-builder": "25.1.8",
+    "html-to-image": "1.11.11",
+    "mermaid": "11.4.0",
+    "prismjs": "1.29.0",
+    "rcedit": "^4.0.1",
+    "sharp": "0.33.5",
+    "tailwindcss": "3.4.17",
+    "to-ico": "^1.1.5"
+  },
+  "build": {
+    "appId": "ir.karnoweb.markdown-tools",
+    "productName": "Markdown Tools",
+    "copyright": "Copyright © karnoweb",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "index.html",
+      "initcontent.md",
+      "manifest.webmanifest",
+      "sw.js",
+      "app/**/*",
+      "assets/**/*",
+      "electron/**/*"
+    ],
+    "asar": true,
+    "fileAssociations": [
+      {
+        "ext": "md",
+        "name": "Markdown Tools",
+        "description": "Markdown document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "icon": "icon.ico"
+      },
+      {
+        "ext": "markdown",
+        "name": "Markdown Tools",
+        "description": "Markdown document",
+        "role": "Editor",
+        "mimeType": "text/markdown",
+        "icon": "icon.ico"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "icon.ico",
+      "executableName": "Markdown Tools",
+      "signAndEditExecutable": false
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "perMachine": true,
+      "shortcutName": "Markdown Tools",
+      "uninstallDisplayName": "Markdown Tools",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "include": "installer.nsh"
+    }
+  }
+}

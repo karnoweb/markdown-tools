@@ -1,0 +1,36 @@
+{
+  "id": "ir.karnoweb.markdown-tools",
+  "name": "Markdown Tools",
+  "short_name": "RTLMD",
+  "description": "RTL Markdown editor with live preview, local history, and export",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "browser"],
+  "orientation": "any",
+  "background_color": "#18181b",
+  "theme_color": "#4361ee",
+  "lang": "fa",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "assets/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/pwa/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
