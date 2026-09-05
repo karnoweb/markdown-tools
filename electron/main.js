@@ -127,6 +127,36 @@ function createWindow() {
 	});
 }
 
+ipcMain.handle('rtlmd:open-file-dialog', async function () {
+	if (!mainWindow || mainWindow.isDestroyed()) {
+		return [];
+	}
+	const result = await dialog.showOpenDialog(mainWindow, {
+		title: 'Open Markdown',
+		properties: ['openFile', 'multiSelections'],
+		filters: [
+			{ name: 'Markdown', extensions: ['md', 'markdown', 'mdown', 'mkd', 'mkdn'] },
+			{ name: 'All files', extensions: ['*'] }
+		]
+	});
+	if (result.canceled || !result.filePaths || !result.filePaths.length) {
+		return [];
+	}
+	const payloads = [];
+	for (let i = 0; i < result.filePaths.length; i++) {
+		const fp = result.filePaths[i];
+		try {
+			payloads.push(readMarkdownFile(fp));
+		} catch (err) {
+			dialog.showErrorBox(
+				'Could not open file',
+				fp + '\n\n' + (err && err.message ? err.message : String(err))
+			);
+		}
+	}
+	return payloads;
+});
+
 ipcMain.handle('rtlmd:save-file', function (_event, payload) {
 	if (!payload || !payload.path) {
 		throw new Error('No file path');

@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('rtlmdDesktop', {
 			callback(payload);
 		});
 	},
+	openFileDialog: function () {
+		return ipcRenderer.invoke('rtlmd:open-file-dialog');
+	},
 	saveFile: function (filePath, content) {
 		return ipcRenderer.invoke('rtlmd:save-file', {
 			path: filePath,

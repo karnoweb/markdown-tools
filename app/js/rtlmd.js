@@ -18,6 +18,18 @@
 	var MOBILE_MQ = '(max-width: 768px)';
 
 	var pendingExternalFiles = [];
+	/* In-memory File System Access handles (cannot survive JSON localStorage). */
+	var fileHandlesByDocId = {};
+
+	var MD_OPEN_TYPES = [
+		{
+			description: 'Markdown',
+			accept: {
+				'text/markdown': ['.md', '.markdown', '.mdown', '.mkd', '.mkdn'],
+				'text/plain': ['.md', '.markdown', '.mdown', '.mkd', '.mkdn']
+			}
+		}
+	];
 
 	var DARK_THEMES = {
 		dark: 1, night: 1, dracula: 1, dim: 1, nord: 1, sunset: 1,
@@ -518,6 +530,10 @@
 		storageSet(FULLVIEW_KEY, on ? '1' : '0');
 	}
 
+	function isFullview() {
+		return $('body').hasClass('fullview');
+	}
+
 	function initFullview() {
 		setFullview(storageGet(FULLVIEW_KEY, '0') === '1');
 	}
@@ -839,11 +855,124 @@
 	}
 
 	function isBlankStarterDoc(doc) {
-		if (!doc || doc.sourcePath) return false;
+		if (!doc || doc.sourcePath || fileHandlesByDocId[doc.id]) return false;
 		var content = String(doc.content || '').trim();
 		if (!content) return true;
 		if (content === '# Markdown Tools\n\nStart writing…') return true;
 		return doc.title === UNTITLED && content.length < 48;
+	}
+
+	/* Persist File System Access handles in IndexedDB (survives reload — unlike localStorage,
+	   which cannot JSON-serialize a FileSystemFileHandle) so "Save" reuses the *same* file
+	   instead of falling back to a Save-As picker that may land in the wrong folder. */
+	var HANDLE_DB_NAME = 'rtlmd-handles';
+	var HANDLE_DB_STORE = 'handles';
+	var handleDbPromise = null;
+
+	function openHandleDb() {
+		if (!('indexedDB' in window)) return Promise.resolve(null);
+		if (handleDbPromise) return handleDbPromise;
+		handleDbPromise = new Promise(function (resolve) {
+			try {
+				var req = indexedDB.open(HANDLE_DB_NAME, 1);
+				req.onupgradeneeded = function () {
+					if (!req.result.objectStoreNames.contains(HANDLE_DB_STORE)) {
+						req.result.createObjectStore(HANDLE_DB_STORE);
+					}
+				};
+				req.onsuccess = function () { resolve(req.result); };
+				req.onerror = function () { resolve(null); };
+			} catch (e) {
+				resolve(null);
+			}
+		});
+		return handleDbPromise;
+	}
+
+	function storeFileHandleRecord(docId, handle) {
+		return openHandleDb().then(function (db) {
+			if (!db) return;
+			try {
+				var tx = db.transaction(HANDLE_DB_STORE, 'readwrite');
+				tx.objectStore(HANDLE_DB_STORE).put(handle, docId);
+			} catch (e) { /* ponytail: handle not structured-clonable in this browser */ }
+		});
+	}
+
+	function loadFileHandleRecord(docId) {
+		return openHandleDb().then(function (db) {
+			if (!db) return null;
+			return new Promise(function (resolve) {
+				try {
+					var tx = db.transaction(HANDLE_DB_STORE, 'readonly');
+					var req = tx.objectStore(HANDLE_DB_STORE).get(docId);
+					req.onsuccess = function () { resolve(req.result || null); };
+					req.onerror = function () { resolve(null); };
+				} catch (e) {
+					resolve(null);
+				}
+			});
+		});
+	}
+
+	function deleteFileHandleRecord(docId) {
+		return openHandleDb().then(function (db) {
+			if (!db) return;
+			try {
+				var tx = db.transaction(HANDLE_DB_STORE, 'readwrite');
+				tx.objectStore(HANDLE_DB_STORE).delete(docId);
+			} catch (e) { /* ignore */ }
+		});
+	}
+
+	function attachFileHandle(doc, handle) {
+		if (!doc || !handle) return;
+		fileHandlesByDocId[doc.id] = handle;
+		storeFileHandleRecord(doc.id, handle);
+	}
+
+	function getFileHandle(doc) {
+		if (!doc) return null;
+		return fileHandlesByDocId[doc.id] || null;
+	}
+
+	/* showOpenFilePicker/showSaveFilePicker (and, in practice, requestPermission too) throw
+	   "Must be handling a user gesture" unless called near-synchronously inside the
+	   click/keydown handler. Any IndexedDB round-trip in between breaks that, so handle
+	   restoration must happen *ahead of time* (in the background, on doc load) — never
+	   inside saveActiveDocToDisk() itself. queryPermission (unlike requestPermission) never
+	   needs a gesture, so it's safe to call here. */
+	function prefetchFileHandle(doc) {
+		if (!doc || !doc.sourcePath || fileHandlesByDocId[doc.id]) return;
+		loadFileHandleRecord(doc.id).then(function (handle) {
+			if (!handle || fileHandlesByDocId[doc.id]) return;
+			if (typeof handle.queryPermission !== 'function') {
+				fileHandlesByDocId[doc.id] = handle;
+				return;
+			}
+			return handle.queryPermission({ mode: 'readwrite' }).then(function (state) {
+				if (state === 'granted') fileHandlesByDocId[doc.id] = handle;
+				/* else: leave unset — Save falls back to a fresh Save-As picker,
+				   still triggered directly from the click/keydown gesture. */
+			});
+		}).catch(function () { /* ignore — fall back to Save-As at save time */ });
+	}
+
+	function canWriteDocToDisk(doc) {
+		if (!doc) return false;
+		if (getFileHandle(doc)) return true;
+		if (!doc.sourcePath) return false;
+		if (window.rtlmdDesktop && typeof window.rtlmdDesktop.saveFile === 'function') return true;
+		if (supportsSaveFilePicker()) return true;
+		return false;
+	}
+
+	function supportsOpenFilePicker() {
+		return typeof window.showOpenFilePicker === 'function';
+	}
+
+	function supportsSaveFilePicker() {
+		return typeof window.showSaveFilePicker === 'function';
 	}
 
 	function openExternalMarkdownFile(payload) {
@@ -852,9 +981,15 @@
 		var existing = findDocBySourcePath(payload.path);
 		if (existing) {
 			persistActiveFromEditor({ silentList: true });
+			if (existing.pinned) {
+				loadDocIntoEditor(existing);
+				if (payload.handle) attachFileHandle(existing, payload.handle);
+				return;
+			}
 			existing.content = payload.content;
 			markDocSavedToDisk(existing, payload.content);
 			existing.updatedAt = Date.now();
+			if (payload.handle) attachFileHandle(existing, payload.handle);
 			writeDocs(docsState.items);
 			loadDocIntoEditor(existing);
 			return;
@@ -864,12 +999,21 @@
 
 		if (docsState.items.length === 1 && isBlankStarterDoc(docsState.items[0])) {
 			var starter = docsState.items[0];
+			if (starter.pinned) {
+				createDoc(payload.content, payload.name || titleFromContent(payload.content), {
+					sourcePath: payload.path,
+					titleLocked: true,
+					fileHandle: payload.handle
+				});
+				return;
+			}
 			starter.content = payload.content;
 			starter.title = payload.name || titleFromContent(payload.content) || UNTITLED;
 			starter.titleLocked = true;
 			starter.sourcePath = payload.path;
 			markDocSavedToDisk(starter, payload.content);
 			starter.updatedAt = Date.now();
+			if (payload.handle) attachFileHandle(starter, payload.handle);
 			writeDocs(docsState.items);
 			loadDocIntoEditor(starter);
 			return;
@@ -877,7 +1021,112 @@
 
 		createDoc(payload.content, payload.name || titleFromContent(payload.content), {
 			sourcePath: payload.path,
-			titleLocked: true
+			titleLocked: true,
+			fileHandle: payload.handle
+		});
+	}
+
+	function readBrowserFileAsPayload(file, handle) {
+		return file.text().then(function (content) {
+			var base = String(file.name || 'document').replace(/\.(md|markdown|mdown|mkd|mkdn)$/i, '');
+			return {
+				path: handle && handle.name ? handle.name : (file.name || base),
+				name: base,
+				content: content,
+				handle: handle || null
+			};
+		});
+	}
+
+	function openMarkdownFromDisk() {
+		if (window.rtlmdDesktop && typeof window.rtlmdDesktop.openFileDialog === 'function') {
+			return window.rtlmdDesktop.openFileDialog().then(function (payloads) {
+				if (!payloads || !payloads.length) return;
+				payloads.forEach(function (payload) {
+					openExternalMarkdownFile(payload);
+				});
+			}).catch(function (err) {
+				window.alert('Could not open file:\n' + (err && err.message ? err.message : String(err)));
+			});
+		}
+
+		if (supportsOpenFilePicker()) {
+			return window.showOpenFilePicker({
+				multiple: true,
+				types: MD_OPEN_TYPES,
+				excludeAcceptAllOption: false
+			}).then(function (handles) {
+				return Promise.all(handles.map(function (handle) {
+					return handle.getFile().then(function (file) {
+						return readBrowserFileAsPayload(file, handle);
+					});
+				}));
+			}).then(function (payloads) {
+				payloads.forEach(function (payload) {
+					openExternalMarkdownFile(payload);
+				});
+			}).catch(function (err) {
+				if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+				window.alert('Could not open file:\n' + (err && err.message ? err.message : String(err)));
+			});
+		}
+
+		var input = document.getElementById('doc-file-input');
+		if (input) {
+			input.value = '';
+			input.click();
+		}
+		return Promise.resolve();
+	}
+
+	function onDocFileInputChange(e) {
+		var input = e.target;
+		var files = input && input.files ? Array.prototype.slice.call(input.files, 0) : [];
+		if (!files.length) return;
+		Promise.all(files.map(function (file) {
+			return readBrowserFileAsPayload(file, null);
+		})).then(function (payloads) {
+			payloads.forEach(function (payload) {
+				/* Legacy file input cannot write back — open as editable history docs. */
+				openExternalMarkdownFile({
+					path: null,
+					name: payload.name,
+					content: payload.content,
+					handle: null
+				});
+			});
+		}).catch(function (err) {
+			window.alert('Could not open file:\n' + (err && err.message ? err.message : String(err)));
+		}).then(function () {
+			input.value = '';
+		});
+	}
+
+	function writeViaFileHandle(handle, content) {
+		return handle.createWritable().then(function (writable) {
+			return writable.write(content).then(function () {
+				return writable.close();
+			});
+		});
+	}
+
+	function pickSaveHandleForDoc(doc) {
+		if (!supportsSaveFilePicker()) return Promise.resolve(null);
+		var suggested = doc.sourcePath || (slugifyFilename(doc.title || UNTITLED) + '.md');
+		if (!/\.(md|markdown|mdown|mkd|mkdn)$/i.test(suggested)) {
+			suggested += '.md';
+		}
+		return window.showSaveFilePicker({
+			suggestedName: suggested.replace(/^.*[\\/]/, ''),
+			types: MD_OPEN_TYPES
+		}).then(function (handle) {
+			attachFileHandle(doc, handle);
+			doc.sourcePath = handle.name || suggested;
+			doc.titleLocked = true;
+			return handle;
+		}).catch(function (err) {
+			if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return null;
+			throw err;
 		});
 	}
 
@@ -979,13 +1228,13 @@
 
 	function isActiveDocDiskDirty() {
 		var doc = findDoc(docsState.activeId);
-		if (!doc || !doc.sourcePath) return false;
+		if (!doc || !canWriteDocToDisk(doc)) return false;
 		var content = $editor && $editor.length ? $editor.val() : doc.content;
 		return content !== doc.lastSavedToDisk;
 	}
 
 	function isDocDiskDirty(doc) {
-		if (!doc || !doc.sourcePath) return false;
+		if (!doc || !canWriteDocToDisk(doc)) return false;
 		return doc.content !== doc.lastSavedToDisk;
 	}
 
@@ -1017,14 +1266,15 @@
 	}
 
 	function saveActiveDocToDisk() {
-		if (!window.rtlmdDesktop || typeof window.rtlmdDesktop.saveFile !== 'function') {
+		var doc = findDoc(docsState.activeId);
+		if (!doc) return Promise.resolve(false);
+		if (doc.pinned) {
 			return Promise.resolve(false);
 		}
-		var doc = findDoc(docsState.activeId);
-		if (!doc || !doc.sourcePath) return Promise.resolve(false);
 
 		var content = $editor && $editor.length ? $editor.val() : doc.content;
-		return window.rtlmdDesktop.saveFile(doc.sourcePath, content).then(function () {
+
+		function finishSave() {
 			doc.content = content;
 			markDocSavedToDisk(doc, content);
 			doc.updatedAt = Date.now();
@@ -1033,6 +1283,36 @@
 			refreshActiveTitleUi('saved');
 			renderDocList();
 			return true;
+		}
+
+		/* Browser: reuse the real file handle if it's already in memory (restored ahead of
+		   time by prefetchFileHandle() when the doc loaded — NOT here, since any async
+		   detour, e.g. an IndexedDB round-trip, right before showSaveFilePicker() makes
+		   Chrome reject it with "Must be handling a user gesture to show a file picker"). */
+		var handle = getFileHandle(doc);
+		if (handle) {
+			return writeViaFileHandle(handle, content).then(finishSave).catch(function (err) {
+				window.alert('Could not save file:\n' + (err && err.message ? err.message : String(err)));
+				return false;
+			});
+		}
+
+		if (doc.sourcePath && window.rtlmdDesktop && typeof window.rtlmdDesktop.saveFile === 'function') {
+			/* Desktop app: writes by absolute path directly, no handle needed. */
+			return window.rtlmdDesktop.saveFile(doc.sourcePath, content).then(finishSave).catch(function (err) {
+				window.alert('Could not save file:\n' + (err && err.message ? err.message : String(err)));
+				return false;
+			});
+		}
+
+		if (!supportsSaveFilePicker()) return Promise.resolve(false);
+
+		/* No usable handle recovered — falls back to Save-As (may create a new file if the
+		   original's permission wasn't remembered by the browser). Called directly, still
+		   inside the same click/keydown gesture. */
+		return pickSaveHandleForDoc(doc).then(function (picked) {
+			if (!picked) return false;
+			return writeViaFileHandle(picked, content).then(finishSave);
 		}).catch(function (err) {
 			window.alert('Could not save file:\n' + (err && err.message ? err.message : String(err)));
 			return false;
@@ -1068,7 +1348,7 @@
 
 			var $pin = $('<button type="button" class="doc-pin icon-btn-xs"></button>')
 				.toggleClass('is-pinned', !!doc.pinned)
-				.attr('title', doc.pinned ? 'Unlock' : 'Lock')
+				.attr('title', doc.pinned ? 'Unlock (allow edits)' : 'Lock (pin & freeze edits)')
 				.attr('aria-label', doc.pinned ? 'Unlock document' : 'Lock document')
 				.attr('aria-pressed', doc.pinned ? 'true' : 'false')
 				.html(lockSvg);
@@ -1095,11 +1375,34 @@
 		return !opts.keepTitle && !doc.titleLocked;
 	}
 
+	function setEditorLocked(locked) {
+		if (!$editor || !$editor.length) return;
+		$editor.prop('readonly', !!locked);
+		$('#textbox').toggleClass('is-locked', !!locked);
+		$('.md-toolbar .md-tool').prop('disabled', !!locked);
+		$('#doc-save').prop('disabled', !!locked);
+	}
+
+	function syncActiveEditorLock() {
+		var doc = findDoc(docsState.activeId);
+		setEditorLocked(!!(doc && doc.pinned));
+	}
+
 	function persistActiveFromEditor(opts) {
 		opts = opts || {};
 		if (!$editor || !$editor.length || !docsState.activeId) return;
 		var doc = findDoc(docsState.activeId);
 		if (!doc) return;
+		if (doc.pinned) {
+			/* Locked: keep stored content; snap editor back if it drifted. */
+			if ($editor.val() !== doc.content) {
+				$editor.val(doc.content || '');
+				if (!opts.silentList) renderPreview();
+			}
+			updateActiveTitleUi(doc.title);
+			if (!opts.silentList) renderDocList();
+			return;
+		}
 		var content = $editor.val();
 		doc.content = content;
 		doc.updatedAt = Date.now();
@@ -1119,10 +1422,13 @@
 		if ($editor && $editor.length) {
 			$editor.val(doc.content || '');
 		}
+		syncActiveEditorLock();
 		updateActiveTitleUi(doc.title || UNTITLED);
 		storageSet(STORAGE_KEY, doc.content || '');
 		if (!opts.skipRender) renderPreview();
 		renderDocList();
+		/* Background restore only — never inside the Save click/keydown handler itself. */
+		prefetchFileHandle(doc);
 	}
 
 	function createDoc(content, title, opts) {
@@ -1137,6 +1443,8 @@
 			while (items.length >= MAX_DOCS && victims.length) {
 				var drop = victims.pop();
 				items = items.filter(function (d) { return d.id !== drop.id; });
+				delete fileHandlesByDocId[drop.id];
+				deleteFileHandleRecord(drop.id);
 			}
 			if (items.length >= MAX_DOCS) {
 				window.alert('Document limit (' + MAX_DOCS + ') reached. Unlock or delete one first.');
@@ -1154,7 +1462,8 @@
 		};
 		if (opts.sourcePath) doc.sourcePath = opts.sourcePath;
 		if (opts.titleLocked) doc.titleLocked = true;
-		if (opts.sourcePath) markDocSavedToDisk(doc, doc.content);
+		if (opts.sourcePath || opts.fileHandle) markDocSavedToDisk(doc, doc.content);
+		if (opts.fileHandle) attachFileHandle(doc, opts.fileHandle);
 		items.unshift(doc);
 		writeDocs(items);
 		loadDocIntoEditor(doc);
@@ -1189,9 +1498,20 @@
 	function togglePinDoc(id) {
 		var doc = findDoc(id);
 		if (!doc) return;
+		if (doc.id === docsState.activeId && !doc.pinned) {
+			persistActiveFromEditor({ silentList: true });
+		}
 		doc.pinned = !doc.pinned;
 		writeDocs(docsState.items);
 		renderDocList();
+		if (doc.id === docsState.activeId) {
+			if (doc.pinned && $editor && $editor.length) {
+				$editor.val(doc.content || '');
+				renderPreview();
+			}
+			syncActiveEditorLock();
+			refreshActiveTitleUi();
+		}
 	}
 
 	function deleteDoc(id) {
@@ -1208,6 +1528,8 @@
 		if (!window.confirm('Delete "' + (doc.title || UNTITLED) + '"?')) return;
 		var wasActive = doc.id === docsState.activeId;
 		var items = docsState.items.filter(function (d) { return d.id !== id; });
+		delete fileHandlesByDocId[id];
+		deleteFileHandleRecord(id);
 		writeDocs(items);
 		if (wasActive) {
 			loadDocIntoEditor(sortDocs(items)[0]);
@@ -1283,6 +1605,17 @@
 			createDoc('# New document\n\n');
 		});
 
+		$('#doc-open').on('click', function () {
+			openMarkdownFromDisk();
+		});
+
+		$('#doc-save').on('click', function () {
+			persistActiveFromEditor();
+			saveActiveDocToDisk();
+		});
+
+		$('#doc-file-input').on('change', onDocFileInputChange);
+
 		$('#doc-list').on('click', '.doc-open', function () {
 			openDoc($(this).closest('.doc-item').data('id'));
 		});
@@ -1303,6 +1636,11 @@
 		});
 
 		$('#sidebar-toggle').on('click', function () {
+			if (isFullview()) {
+				setFullview(false);
+				setSidebarOpen(true);
+				return;
+			}
 			setSidebarOpen(document.documentElement.classList.contains('sidebar-collapsed'));
 		});
 
@@ -1447,6 +1785,8 @@
 
 	function applyMdTool(action) {
 		if (!$editor || !$editor.length) return;
+		var active = findDoc(docsState.activeId);
+		if (active && active.pinned) return;
 		var el = $editor[0];
 		var start = el.selectionStart;
 		var end = el.selectionEnd;
@@ -1812,6 +2152,13 @@
 	var scheduleSave = debounce(saveContent, 400);
 
 	function onEditorChange() {
+		var active = findDoc(docsState.activeId);
+		if (active && active.pinned) {
+			if ($editor && $editor.val() !== active.content) {
+				$editor.val(active.content || '');
+			}
+			return;
+		}
 		if (!rafPending) {
 			rafPending = true;
 			requestAnimationFrame(function () {
@@ -1838,15 +2185,28 @@
 			if (scrollSyncOn) rebuildEditorLineYs();
 		}, 150));
 		$editor.on('keydown', function (e) {
+			var active = findDoc(docsState.activeId);
+			if (active && active.pinned) {
+				if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+					/* ponytail: e.code is the physical key (layout-independent) — e.key
+					   depends on the active keyboard layout (e.g. Persian) and would
+					   silently fail to match, letting the browser's own shortcut fire. */
+					var lockCode = e.code;
+					if (lockCode === 'KeyB' || lockCode === 'KeyI' || lockCode === 'KeyK') {
+						e.preventDefault();
+					}
+				}
+				return;
+			}
 			if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
-			var key = e.key.toLowerCase();
-			if (key === 'b') {
+			var code = e.code;
+			if (code === 'KeyB') {
 				e.preventDefault();
 				applyMdTool('bold');
-			} else if (key === 'i') {
+			} else if (code === 'KeyI') {
 				e.preventDefault();
 				applyMdTool('italic');
-			} else if (key === 'k') {
+			} else if (code === 'KeyK') {
 				e.preventDefault();
 				applyMdTool('link');
 			}
@@ -1926,19 +2286,28 @@
 		});
 
 		$(document).on('keydown', function (e) {
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+			/* ponytail: e.code (physical key, e.g. "KeyS") is layout-independent — e.key
+			   depends on the active keyboard layout (Persian, Arabic, …) and can fail to
+			   equal 's'/'o'/'n', silently skipping preventDefault() and letting the
+			   browser's native Ctrl+S "Save Page" / Ctrl+O "Open File" dialog take over. */
+			if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') {
 				e.preventDefault();
 				persistActiveFromEditor();
 				saveActiveDocToDisk();
 				return;
 			}
-			if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n' && !e.shiftKey) {
+			if ((e.ctrlKey || e.metaKey) && e.code === 'KeyO') {
+				e.preventDefault();
+				openMarkdownFromDisk();
+				return;
+			}
+			if ((e.ctrlKey || e.metaKey) && e.code === 'KeyN' && !e.shiftKey) {
 				e.preventDefault();
 				createDoc('# New document\n\n');
 				return;
 			}
 			if (e.key === 'Escape') {
-				if ($('body').hasClass('fullview')) {
+				if (isFullview()) {
 					setFullview(false);
 				} else if (isMobile() &&
 					!document.documentElement.classList.contains('sidebar-collapsed')) {

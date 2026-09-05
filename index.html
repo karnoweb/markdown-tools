@@ -120,9 +120,15 @@
 			<aside id="sidebar" class="sidebar" aria-label="File history">
 				<div class="sidebar-head">
 					<span class="sidebar-title">Files</span>
-					<button type="button" id="doc-new" class="icon-btn-xs doc-new-btn" title="New document" aria-label="New document">
-						<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"/></svg>
-					</button>
+					<div class="sidebar-head-actions">
+						<button type="button" id="doc-open" class="icon-btn-xs doc-open-btn" title="Open Markdown file" aria-label="Open Markdown file">
+							<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9l-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2z"/></svg>
+						</button>
+						<button type="button" id="doc-new" class="icon-btn-xs doc-new-btn" title="New document" aria-label="New document">
+							<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14"/></svg>
+						</button>
+					</div>
+					<input type="file" id="doc-file-input" class="sr-only" accept=".md,.markdown,.mdown,.mkd,.mkdn,text/markdown,text/x-markdown" tabindex="-1" aria-hidden="true">
 				</div>
 				<ul id="doc-list" class="doc-list" role="list"></ul>
 				<p id="doc-empty" class="doc-empty hidden">No documents yet. Tap +.</p>
@@ -138,7 +144,12 @@
 				<div id="textbox" class="editor-pane">
 					<div class="pane-header">
 						<span>Editor</span>
-						<span id="active-doc-title" class="pane-doc-title" title=""></span>
+						<span class="pane-header-actions">
+							<span id="active-doc-title" class="pane-doc-title" title=""></span>
+							<button type="button" id="doc-save" class="icon-btn-xs doc-save-btn" title="Save changes (Ctrl+S)" aria-label="Save changes">
+								<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-8H7v8M7 3v5h8M5 3h11l4 4v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
+							</button>
+						</span>
 					</div>
 					<div class="md-toolbar" role="toolbar" aria-label="Markdown formatting">
 						<button type="button" class="md-tool" data-md="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>

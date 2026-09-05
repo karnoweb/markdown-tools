@@ -1,6 +1,6 @@
 'use strict';
 
-var CACHE_NAME = 'rtlmd-v3';
+var CACHE_NAME = 'rtlmd-v4';
 var PRECACHE = [
 	'./',
 	'./index.html',

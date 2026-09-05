@@ -354,6 +354,12 @@ html.sidebar-collapsed .sidebar {
   flex-shrink: 0;
 }
 
+.sidebar-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
 .sidebar-title {
   font-size: 0.78rem;
   font-weight: 700;
@@ -516,6 +522,28 @@ html.sidebar-collapsed .sidebar {
   flex-shrink: 0;
 }
 
+.doc-open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 0.4rem;
+  background: oklch(var(--b3));
+  color: oklch(var(--bc));
+}
+
+.doc-open-btn:hover {
+  background: oklch(var(--p) / 0.22);
+  color: oklch(var(--p));
+}
+
+.doc-open-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
 .doc-delete:hover {
   color: oklch(var(--er));
 }
@@ -583,6 +611,14 @@ html.sidebar-collapsed .sidebar {
   overflow: hidden;
 }
 
+.pane-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .pane-doc-title {
   font-weight: 500;
   opacity: 0.7;
@@ -592,6 +628,15 @@ html.sidebar-collapsed .sidebar {
   text-overflow: ellipsis;
   text-transform: none;
   letter-spacing: 0;
+}
+
+.doc-save-btn {
+  flex-shrink: 0;
+}
+
+.doc-save-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .pane-doc-title.is-dirty {
@@ -697,6 +742,34 @@ html.sidebar-collapsed .sidebar {
 #textbox textarea:focus {
   outline: none;
   box-shadow: inset 0 0 0 2px oklch(var(--p) / 0.35);
+}
+
+#textbox.is-locked textarea {
+  cursor: default;
+  opacity: 0.92;
+  background-image: linear-gradient(
+    135deg,
+    oklch(var(--p) / 0.04) 25%,
+    transparent 25%,
+    transparent 50%,
+    oklch(var(--p) / 0.04) 50%,
+    oklch(var(--p) / 0.04) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 18px 18px;
+}
+
+#textbox.is-locked .md-toolbar {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+#textbox.is-locked .pane-header > span::after {
+  content: ' · locked';
+  font-weight: 500;
+  opacity: 0.65;
+  font-size: 0.78em;
 }
 
 /* Off-screen mirror for wrapped-line Y map (scroll sync) */
