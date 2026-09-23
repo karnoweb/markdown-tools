@@ -188,10 +188,17 @@
 	function syncTocVisibility() {
 		var nav = document.getElementById('preview-toc');
 		if (!nav) return;
+		var toggleBtn = document.getElementById('toc-toggle');
 		var full = document.body.classList.contains('fullview');
 		var hasList = !!nav.querySelector('.toc-list');
 		var show = full && tocEnabledInSettings() && hasList;
 		nav.classList.toggle('hidden', !show);
+		if (toggleBtn) {
+			var canToggle = full && hasList;
+			toggleBtn.classList.toggle('hidden', !canToggle);
+			toggleBtn.classList.toggle('is-active', show);
+			toggleBtn.setAttribute('aria-pressed', show ? 'true' : 'false');
+		}
 	}
 
 	function buildTocFromHtml() {
@@ -229,6 +236,16 @@
 	window.rtlmdOnFullviewChange = function () {
 		syncTocVisibility();
 	};
+
+	function closeToc() {
+		storageSet(TOC_KEY, '0');
+		syncTocVisibility();
+	}
+
+	function toggleToc() {
+		storageSet(TOC_KEY, tocEnabledInSettings() ? '0' : '1');
+		syncTocVisibility();
+	}
 
 	function renderFrontMatterBanner() {
 		var host = document.getElementById('front-matter-banner');
@@ -610,7 +627,9 @@
 	function hookRenderPreview() {
 		window.rtlmdAfterPreview = function () {
 			renderFrontMatterBanner();
-			if (storageGet(TOC_KEY, '1') !== '0') buildTocFromHtml();
+			// Always (re)build the TOC list, even when the setting is off —
+			// otherwise the toggle button/panel has nothing to show once re-enabled.
+			buildTocFromHtml();
 			updateWordCount();
 			syncLineNumbers();
 		};
@@ -618,6 +637,10 @@
 
 	function bindUi() {
 		document.getElementById('btn-settings').addEventListener('click', openSettings);
+		var tocCloseBtn = document.getElementById('toc-close');
+		if (tocCloseBtn) tocCloseBtn.addEventListener('click', closeToc);
+		var tocToggleBtn = document.getElementById('toc-toggle');
+		if (tocToggleBtn) tocToggleBtn.addEventListener('click', toggleToc);
 		document.getElementById('settings-form').addEventListener('submit', function (e) {
 			e.preventDefault();
 			saveSettingsFromDialog();

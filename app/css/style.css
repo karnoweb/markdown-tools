@@ -486,6 +486,15 @@ html.sidebar-collapsed .sidebar {
   color: oklch(var(--bc));
 }
 
+.toc-toggle-btn.is-active {
+  background: oklch(var(--b3));
+  color: oklch(var(--p));
+}
+
+.toc-toggle-btn.hidden {
+  display: none;
+}
+
 .doc-pin {
   display: inline-flex;
   align-items: center;
@@ -1759,10 +1768,37 @@ html[data-theme="karnoweb-dark"] {
 }
 
 .preview-toc .toc-heading {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   font-weight: 700;
   margin-bottom: 0.35rem;
   opacity: 0.75;
+}
+
+.toc-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.toc-close:hover,
+.toc-close:focus-visible {
+  opacity: 1;
+  background: oklch(var(--b3) / 0.6);
 }
 
 .toc-list {

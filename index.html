@@ -52,7 +52,7 @@
 		<link id="prism-theme" href="assets/vendor/prism/themes/prism-tomorrow.min.css" rel="stylesheet">
 		<link href="assets/vendor/tailwind.css" rel="stylesheet">
 		<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
-		<link rel="stylesheet" href="app/css/style.css?v=10">
+		<link rel="stylesheet" href="app/css/style.css?v=11">
 	</head>
 	<body>
 		<header id="header" class="app-bar">
@@ -213,6 +213,7 @@
 				<div class="editor-pane editor-pane--preview">
 					<div class="pane-header pane-header--preview">
 						<span data-i18n="preview">Preview</span>
+						<button type="button" id="toc-toggle" class="icon-btn-xs toc-toggle-btn hidden" data-i18n-title="toc" title="Contents" aria-label="Contents" aria-pressed="false">&#9776;</button>
 						<div class="export-actions" role="group" aria-label="Export">
 							<button type="button" class="btn btn-xs btn-ghost" data-export="html" title="Download HTML">HTML</button>
 							<button type="button" class="btn btn-xs btn-ghost" data-export="markdown" title="Download Markdown">Markdown</button>
@@ -223,7 +224,12 @@
 					</div>
 					<div id="front-matter-banner" class="front-matter-banner hidden"></div>
 					<div class="preview-body">
-						<nav id="preview-toc" class="preview-toc hidden" aria-label="Table of contents"><span class="toc-heading" data-i18n="toc">Contents</span></nav>
+						<nav id="preview-toc" class="preview-toc hidden" aria-label="Table of contents">
+							<div class="toc-heading">
+								<span data-i18n="toc">Contents</span>
+								<button type="button" id="toc-close" class="toc-close" data-i18n-title="close" title="Close" aria-label="Close">&times;</button>
+							</div>
+						</nav>
 						<div id="output" class="markdown-body"></div>
 					</div>
 				</div>
@@ -267,6 +273,6 @@
 		<script src="assets/vendor/html-to-image/html-to-image.js"></script>
 		<script src="assets/vendor/katex/katex.min.js"></script>
 		<script src="app/js/rtlmd.js?v=13"></script>
-		<script src="app/js/rtlmd-extras.js?v=1"></script>
+		<script src="app/js/rtlmd-extras.js?v=2"></script>
 	</body>
 </html>

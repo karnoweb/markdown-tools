@@ -1,7 +1,7 @@
 {
   "name": "markdown-tools",
   "productName": "Markdown Tools",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "description": "RTL Markdown editor with live preview and export",
   "author": "karnoweb",
   "license": "MIT",

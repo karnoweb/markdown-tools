@@ -8,7 +8,7 @@ RTL Markdown editor with live preview — built for [karnoweb.ir](https://karnow
 - Local document history in `localStorage` (create, open, rename, lock, delete)
 - Locked documents cannot be deleted until unlocked
 - Markdown formatting toolbar (bold, italic, strike, headings, lists, tasks, tables, code, links, images)
-- Find/replace (Ctrl+F / Ctrl+H), document search, TOC, word count, line numbers
+- Find/replace (Ctrl+F / Ctrl+H), document search, closable/toggleable TOC in full preview, word count, line numbers
 - Paste/drop images into Markdown; KaTeX math (`$…$`, `$$…$$`); YAML front matter banner
 - Local snapshots, backup import/export, optional autosave-to-disk, Persian/English UI
 - Side-by-side edit and preview (RTL / LTR)
