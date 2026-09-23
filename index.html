@@ -51,7 +51,8 @@
 		<link rel="apple-touch-icon" href="assets/pwa/icon-192.png">
 		<link id="prism-theme" href="assets/vendor/prism/themes/prism-tomorrow.min.css" rel="stylesheet">
 		<link href="assets/vendor/tailwind.css" rel="stylesheet">
-		<link rel="stylesheet" href="app/css/style.css?v=6">
+		<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+		<link rel="stylesheet" href="app/css/style.css?v=10">
 	</head>
 	<body>
 		<header id="header" class="app-bar">
@@ -110,6 +111,12 @@
 					</select>
 				</label>
 
+				<button type="button" id="btn-find-toggle" class="icon-btn" title="Find (Ctrl+F)" aria-label="Find">
+					<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+				</button>
+				<button type="button" id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings">
+					<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+				</button>
 				<button type="button" id="pwa-install" class="icon-btn hidden" title="Install app" aria-label="Install app">
 					<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
 				</button>
@@ -119,8 +126,13 @@
 		<div class="app-shell">
 			<aside id="sidebar" class="sidebar" aria-label="File history">
 				<div class="sidebar-head">
-					<span class="sidebar-title">Files</span>
+					<span class="sidebar-title" data-i18n="files">Files</span>
 					<div class="sidebar-head-actions">
+						<button type="button" id="doc-open-folder" class="icon-btn-xs" data-i18n-title="openFolder" title="Open folder" aria-label="Open folder">📁</button>
+						<button type="button" id="doc-backup-export" class="icon-btn-xs" data-i18n-title="backupExport" title="Export backup" aria-label="Export backup">⤓</button>
+						<label class="icon-btn-xs backup-import-label" data-i18n-title="backupImport" title="Import backup" aria-label="Import backup">
+							⤒<input type="file" id="doc-backup-import" class="sr-only" accept="application/json,.json">
+						</label>
 						<button type="button" id="doc-open" class="icon-btn-xs doc-open-btn" title="Open Markdown file" aria-label="Open Markdown file">
 							<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9l-2-2H5a2 2 0 00-2 2v7a2 2 0 002 2z"/></svg>
 						</button>
@@ -130,6 +142,17 @@
 					</div>
 					<input type="file" id="doc-file-input" class="sr-only" accept=".md,.markdown,.mdown,.mkd,.mkdn,text/markdown,text/x-markdown" tabindex="-1" aria-hidden="true">
 				</div>
+				<div class="sidebar-tools">
+					<input type="search" id="doc-search" class="input input-sm input-bordered w-full" data-i18n-placeholder="searchDocs" placeholder="Search documents…" autocomplete="off">
+					<select id="doc-template" class="select select-sm select-bordered w-full" aria-label="Template">
+						<option value="" data-i18n="newFromTemplate">New from template</option>
+						<option value="blank" data-i18n="templateBlank">Blank</option>
+						<option value="note" data-i18n="templateNote">Note</option>
+						<option value="meeting" data-i18n="templateMeeting">Meeting</option>
+						<option value="readme" data-i18n="templateReadme">README</option>
+						<option value="report" data-i18n="templateReport">Report</option>
+					</select>
+				</div>
 				<ul id="doc-list" class="doc-list" role="list"></ul>
 				<p id="doc-empty" class="doc-empty hidden">No documents yet. Tap +.</p>
 			</aside>
@@ -138,13 +161,28 @@
 
 			<div id="editor" class="workspace" dir="ltr">
 				<div class="mobile-view-toggle" role="tablist" aria-label="Editor view">
-					<button type="button" class="mobile-view-btn is-active" data-view="editor" role="tab" aria-selected="true">Edit</button>
-					<button type="button" class="mobile-view-btn" data-view="preview" role="tab" aria-selected="false">Preview</button>
+					<button type="button" class="mobile-view-btn is-active" data-view="editor" role="tab" aria-selected="true" data-i18n="editTab">Edit</button>
+					<button type="button" class="mobile-view-btn" data-view="preview" role="tab" aria-selected="false" data-i18n="preview">Preview</button>
 				</div>
 				<div id="textbox" class="editor-pane">
+					<div id="find-panel" class="find-panel hidden" role="search">
+						<label class="sr-only" for="find-input">Find</label>
+						<input type="text" id="find-input" class="input input-xs input-bordered" data-i18n-placeholder="find" placeholder="Find">
+						<label class="sr-only" for="replace-input">Replace</label>
+						<input type="text" id="replace-input" class="input input-xs input-bordered" data-i18n-placeholder="replace" placeholder="Replace">
+						<label class="find-case-label"><input type="checkbox" id="find-case"> Aa</label>
+						<button type="button" id="find-prev" class="btn btn-xs btn-ghost" data-i18n="findPrev">Previous</button>
+						<button type="button" id="find-next" class="btn btn-xs btn-ghost" data-i18n="findNext">Next</button>
+						<button type="button" id="find-replace-one" class="btn btn-xs btn-ghost" data-i18n="replaceOne">Replace</button>
+						<button type="button" id="find-replace-all" class="btn btn-xs btn-ghost" data-i18n="replaceAll">Replace all</button>
+						<button type="button" id="find-close" class="btn btn-xs btn-ghost" data-i18n="close">Close</button>
+					</div>
 					<div class="pane-header">
-						<span>Editor</span>
+						<span data-i18n="editor">Editor</span>
 						<span class="pane-header-actions">
+							<span id="editor-stats" class="editor-stats"></span>
+							<button type="button" id="btn-snapshot" class="btn btn-xs btn-ghost" data-i18n="snapshot">Snapshot</button>
+							<button type="button" id="btn-restore-snapshot" class="btn btn-xs btn-ghost" data-i18n="restoreSnapshot">Restore</button>
 							<span id="active-doc-title" class="pane-doc-title" title=""></span>
 							<button type="button" id="doc-save" class="icon-btn-xs doc-save-btn" title="Save changes (Ctrl+S)" aria-label="Save changes">
 								<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 21v-8H7v8M7 3v5h8M5 3h11l4 4v11a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/></svg>
@@ -162,23 +200,55 @@
 						<button type="button" class="md-tool" data-md="ol" title="Numbered list">1. List</button>
 						<button type="button" class="md-tool" data-md="quote" title="Quote">“</button>
 						<button type="button" class="md-tool" data-md="hr" title="Horizontal rule">—</button>
+						<button type="button" class="md-tool" data-md="strike" title="Strikethrough">S̶</button>
+						<button type="button" class="md-tool" data-md="table" title="Table">Tbl</button>
+						<button type="button" class="md-tool" data-md="task" title="Task list">☑</button>
+						<button type="button" class="md-tool" data-md="image" title="Image">Img</button>
 					</div>
-					<textarea aria-label="Markdown editor" spellcheck="false"></textarea>
+					<div class="editor-body">
+						<div id="line-numbers" class="line-numbers hidden" aria-hidden="true"></div>
+						<textarea aria-label="Markdown editor" spellcheck="false"></textarea>
+					</div>
 				</div>
 				<div class="editor-pane editor-pane--preview">
 					<div class="pane-header pane-header--preview">
-						<span>Preview</span>
+						<span data-i18n="preview">Preview</span>
 						<div class="export-actions" role="group" aria-label="Export">
 							<button type="button" class="btn btn-xs btn-ghost" data-export="html" title="Download HTML">HTML</button>
 							<button type="button" class="btn btn-xs btn-ghost" data-export="markdown" title="Download Markdown">Markdown</button>
 							<button type="button" class="btn btn-xs btn-ghost" data-export="pdf" title="Print or save as PDF">PDF</button>
-							<button type="button" class="btn btn-xs btn-ghost" data-export="image" title="Download PNG preview">Image</button>
+							<button type="button" class="btn btn-xs btn-ghost" data-export="image" title="Download PNG (high resolution)">Image</button>
+							<button type="button" class="btn btn-xs btn-ghost" data-export="docx" title="Download Word document" data-i18n="exportDocx">Word</button>
 						</div>
 					</div>
-					<div id="output" class="markdown-body"></div>
+					<div id="front-matter-banner" class="front-matter-banner hidden"></div>
+					<div class="preview-body">
+						<nav id="preview-toc" class="preview-toc hidden" aria-label="Table of contents"><span class="toc-heading" data-i18n="toc">Contents</span></nav>
+						<div id="output" class="markdown-body"></div>
+					</div>
 				</div>
 			</div>
 		</div>
+
+		<dialog id="settings-dialog" class="settings-dialog">
+			<form id="settings-form" method="dialog">
+				<h2 data-i18n="settings">Settings</h2>
+				<label class="settings-row">
+					<span data-i18n="language">Language</span>
+					<select id="set-lang" class="select select-sm select-bordered">
+						<option value="fa" data-i18n="langFa">Persian</option>
+						<option value="en" data-i18n="langEn">English</option>
+					</select>
+				</label>
+				<label class="settings-row"><input type="checkbox" id="set-spell"> <span data-i18n="spellcheck">Spellcheck</span></label>
+				<label class="settings-row"><input type="checkbox" id="set-autosave"> <span data-i18n="autosaveDisk">Autosave to disk</span></label>
+				<label class="settings-row"><input type="checkbox" id="set-linenum"> <span data-i18n="lineNumbers">Line numbers</span></label>
+				<label class="settings-row"><input type="checkbox" id="set-toc" checked> <span data-i18n="toc">Contents</span></label>
+				<div class="settings-actions">
+					<button type="submit" class="btn btn-sm btn-primary" data-i18n="close">Close</button>
+				</div>
+			</form>
+		</dialog>
 
 		<script src="assets/marked/marked.min.js"></script>
 		<script src="assets/jquery/dist/jquery.min.js"></script>
@@ -195,6 +265,8 @@
 		<script>Prism.plugins.autoloader.languages_path = 'assets/vendor/prism/components/';</script>
 		<script src="assets/vendor/mermaid/mermaid.min.js"></script>
 		<script src="assets/vendor/html-to-image/html-to-image.js"></script>
-		<script src="app/js/rtlmd.js?v=10"></script>
+		<script src="assets/vendor/katex/katex.min.js"></script>
+		<script src="app/js/rtlmd.js?v=13"></script>
+		<script src="app/js/rtlmd-extras.js?v=1"></script>
 	</body>
 </html>

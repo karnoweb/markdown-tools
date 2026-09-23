@@ -125,6 +125,14 @@ async function main() {
 		path.join(nm, 'mermaid', 'dist', 'mermaid.min.js'),
 		path.join(vendor, 'mermaid', 'mermaid.min.js')
 	);
+	copyFile(
+		path.join(nm, 'katex', 'dist', 'katex.min.js'),
+		path.join(vendor, 'katex', 'katex.min.js')
+	);
+	copyFile(
+		path.join(nm, 'katex', 'dist', 'katex.min.css'),
+		path.join(vendor, 'katex', 'katex.min.css')
+	);
 
 	const prismRoot = path.join(nm, 'prismjs');
 	copyFile(path.join(prismRoot, 'prism.js'), path.join(vendor, 'prism', 'prism.min.js'));

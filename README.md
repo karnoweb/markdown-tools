@@ -7,11 +7,14 @@ RTL Markdown editor with live preview — built for [karnoweb.ir](https://karnow
 - Pro layout: slim header + file history sidebar + editor/preview
 - Local document history in `localStorage` (create, open, rename, lock, delete)
 - Locked documents cannot be deleted until unlocked
-- Markdown formatting toolbar (bold, italic, headings, lists, code, links)
+- Markdown formatting toolbar (bold, italic, strike, headings, lists, tasks, tables, code, links, images)
+- Find/replace (Ctrl+F / Ctrl+H), document search, TOC, word count, line numbers
+- Paste/drop images into Markdown; KaTeX math (`$…$`, `$$…$$`); YAML front matter banner
+- Local snapshots, backup import/export, optional autosave-to-disk, Persian/English UI
 - Side-by-side edit and preview (RTL / LTR)
 - Karnoweb brand themes (Pro Dark / Pro Light)
 - Code highlighting (Prism), copyable code blocks, and diagrams (Mermaid)
-- Export: HTML, Markdown, PDF, image (PNG)
+- Export: HTML, Markdown, PDF, image (PNG), Word (.doc)
 - **Web**: PWA with offline cache (via Laragon or any static host)
 - **Desktop**: Electron builds for Windows, Linux, and macOS
 

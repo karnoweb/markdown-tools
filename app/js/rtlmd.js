@@ -160,7 +160,22 @@
 	});
 
 	function parseMarkdown(src) {
-		return marked.parse(src);
+		if (typeof window.rtlmdPreprocessMarkdown === 'function') {
+			src = window.rtlmdPreprocessMarkdown(src);
+		}
+		var html = marked.parse(src);
+		if (typeof window.rtlmdPostprocessMarkdownHtml === 'function') {
+			html = window.rtlmdPostprocessMarkdownHtml(html, src);
+		}
+		return html;
+	}
+
+	function confirmLeaveIfDiskDirty() {
+		if (!isActiveDocDiskDirty()) return true;
+		var msg = typeof window.rtlmdT === 'function'
+			? window.rtlmdT('unsavedDiskLeave')
+			: 'This file has unsaved changes on disk. Leave anyway?';
+		return window.confirm(msg);
 	}
 
 	function storageGet(key, fallback) {
@@ -528,6 +543,9 @@
 			setMobileView('preview');
 		}
 		storageSet(FULLVIEW_KEY, on ? '1' : '0');
+		if (typeof window.rtlmdOnFullviewChange === 'function') {
+			window.rtlmdOnFullviewChange(on);
+		}
 	}
 
 	function isFullview() {
@@ -1282,6 +1300,9 @@
 			storageSet(STORAGE_KEY, content);
 			refreshActiveTitleUi('saved');
 			renderDocList();
+			if (typeof window.rtlmdOnDiskSaved === 'function') {
+				window.rtlmdOnDiskSaved(doc);
+			}
 			return true;
 		}
 
@@ -1361,6 +1382,7 @@
 			var $actions = $('<div class="doc-actions"></div>');
 			$actions.append(
 				$pin,
+				$('<button type="button" class="doc-duplicate icon-btn-xs" title="Duplicate">⧉</button>'),
 				$('<button type="button" class="doc-rename icon-btn-xs" title="Rename">✎</button>'),
 				$del
 			);
@@ -1457,6 +1479,7 @@
 			title: title || titleFromContent(content || '') || UNTITLED,
 			content: content || '',
 			pinned: false,
+			snapshots: [],
 			updatedAt: now,
 			createdAt: now
 		};
@@ -1472,6 +1495,7 @@
 
 	function openDoc(id) {
 		if (!id || id === docsState.activeId) return;
+		if (!confirmLeaveIfDiskDirty()) return;
 		var doc = findDoc(id);
 		if (!doc) return;
 		persistActiveFromEditor({ silentList: true });
@@ -1564,6 +1588,7 @@
 					sourcePath: d.sourcePath || null,
 					titleLocked: !!d.titleLocked,
 					lastSavedToDisk: typeof d.lastSavedToDisk === 'string' ? d.lastSavedToDisk : null,
+					snapshots: Array.isArray(d.snapshots) ? d.snapshots : [],
 					updatedAt: d.updatedAt || Date.now(),
 					createdAt: d.createdAt || d.updatedAt || Date.now()
 				};
@@ -1602,10 +1627,12 @@
 
 	function bindDocsUi() {
 		$('#doc-new').on('click', function () {
+			if (!confirmLeaveIfDiskDirty()) return;
 			createDoc('# New document\n\n');
 		});
 
 		$('#doc-open').on('click', function () {
+			if (!confirmLeaveIfDiskDirty()) return;
 			openMarkdownFromDisk();
 		});
 
@@ -1618,6 +1645,13 @@
 
 		$('#doc-list').on('click', '.doc-open', function () {
 			openDoc($(this).closest('.doc-item').data('id'));
+		});
+
+		$('#doc-list').on('click', '.doc-duplicate', function (e) {
+			e.stopPropagation();
+			if (typeof window.rtlmdDuplicateDoc === 'function') {
+				window.rtlmdDuplicateDoc($(this).closest('.doc-item').data('id'));
+			}
 		});
 
 		$('#doc-list').on('click', '.doc-rename', function (e) {
@@ -1648,8 +1682,12 @@
 			setSidebarOpen(false);
 		});
 
-		$(window).on('beforeunload', function () {
+		$(window).on('beforeunload', function (e) {
 			persistActiveFromEditor({ silentList: true, keepTitle: false });
+			if (isActiveDocDiskDirty()) {
+				e.preventDefault();
+				e.returnValue = '';
+			}
 		});
 	}
 
@@ -1718,6 +1756,9 @@
 		attachCodeCopyButtons();
 		renderMermaid();
 		refreshScrollMaps();
+		if (typeof window.rtlmdAfterPreview === 'function') {
+			window.rtlmdAfterPreview();
+		}
 	}
 
 	function attachCodeCopyButtons() {
@@ -1826,6 +1867,19 @@
 				break;
 			case 'hr':
 				insert = '\n\n---\n\n';
+				break;
+			case 'strike':
+				insert = wrapSelection(selected || 'text', '~~', '~~');
+				break;
+			case 'table':
+				insert = selected || '| Column 1 | Column 2 |\n| --- | --- |\n| Cell | Cell |';
+				break;
+			case 'task':
+				insert = selected ? prefixLines(selected, '- [ ] ') : '- [ ] Task';
+				break;
+			case 'image':
+				insert = '![' + (selected || 'alt') + '](https://)';
+				cursor = start + insert.lastIndexOf('https://') + 'https://'.length;
 				break;
 			default:
 				return;
@@ -2086,6 +2140,157 @@
 		}
 	}
 
+	/* html-to-image downscales when side × pixelRatio > 16384; browsers cap canvas ~32767px/side. */
+	var HTML_TO_IMAGE_MAX_SIDE = 16384;
+	var BROWSER_MAX_CANVAS_SIDE = 32767;
+
+	function imageExportTargetPixelRatio() {
+		return Math.min(3, Math.max(window.devicePixelRatio || 1, 2));
+	}
+
+	function imageExportTileCssHeight(pixelRatio) {
+		return Math.floor(HTML_TO_IMAGE_MAX_SIDE / pixelRatio) - 32;
+	}
+
+	function imageExportSegmentCssHeight(pixelRatio) {
+		return Math.floor(BROWSER_MAX_CANVAS_SIDE / pixelRatio) - 32;
+	}
+
+	function imageExportSliceCanvas(node, fullWidth, fullHeight, offsetY, sliceH, pixelRatio, bg) {
+		/* translateY in html-to-image only renders for offset 0; shift children instead. */
+		var wrap = document.createElement('div');
+		wrap.setAttribute('data-rtlmd-export-slice', '1');
+		wrap.style.cssText = 'position:relative;margin-top:-' + offsetY + 'px;width:100%;box-sizing:border-box;';
+		var kids = Array.prototype.slice.call(node.childNodes);
+		kids.forEach(function (child) {
+			wrap.appendChild(child);
+		});
+		node.appendChild(wrap);
+		node.style.height = sliceH + 'px';
+		node.style.overflow = 'hidden';
+
+		return window.htmlToImage.toCanvas(node, {
+			width: fullWidth,
+			height: sliceH,
+			pixelRatio: pixelRatio,
+			backgroundColor: bg,
+			cacheBust: true,
+			preferredFontFormat: 'woff2'
+		}).then(function (canvas) {
+			var inner = Array.prototype.slice.call(wrap.childNodes);
+			inner.forEach(function (child) {
+				node.appendChild(child);
+			});
+			wrap.remove();
+			node.style.height = fullHeight + 'px';
+			node.style.overflow = 'visible';
+			return canvas;
+		}, function (err) {
+			try {
+				if (wrap.parentNode === node) {
+					var inner = Array.prototype.slice.call(wrap.childNodes);
+					inner.forEach(function (child) {
+						node.appendChild(child);
+					});
+					wrap.remove();
+				}
+				node.style.height = fullHeight + 'px';
+				node.style.overflow = 'visible';
+			} catch (e) { /* ignore restore errors */ }
+			throw err;
+		});
+	}
+
+	function imageExportSegmentCanvas(node, fullWidth, fullHeight, segmentY, segmentH, pixelRatio, bg) {
+		var tileH = imageExportTileCssHeight(pixelRatio);
+		var tiles = [];
+		var y = 0;
+
+		function captureNextTile() {
+			if (y >= segmentH) {
+				var outW = Math.ceil(fullWidth * pixelRatio);
+				var outH = Math.ceil(segmentH * pixelRatio);
+				var out = document.createElement('canvas');
+				out.width = outW;
+				out.height = outH;
+				var ctx = out.getContext('2d');
+				if (bg) {
+					ctx.fillStyle = bg;
+					ctx.fillRect(0, 0, outW, outH);
+				}
+				tiles.forEach(function (t) {
+					ctx.drawImage(t.canvas, 0, Math.round(t.y * pixelRatio));
+				});
+				return Promise.resolve(out);
+			}
+			var h = Math.min(tileH, segmentH - y);
+			var offsetY = segmentY + y;
+			return imageExportSliceCanvas(node, fullWidth, fullHeight, offsetY, h, pixelRatio, bg).then(function (canvas) {
+				tiles.push({ canvas: canvas, y: y, h: h });
+				y += h;
+				return captureNextTile();
+			});
+		}
+
+		return captureNextTile();
+	}
+
+	function canvasToPngDataUrl(canvas) {
+		var url = canvas.toDataURL('image/png');
+		if (!url || url.length < 64 || url === 'data:,') {
+			throw new Error('PNG encode failed');
+		}
+		return url;
+	}
+
+	function downloadDataUrlsSequential(items) {
+		var i = 0;
+		function next() {
+			if (i >= items.length) return Promise.resolve();
+			var item = items[i];
+			i += 1;
+			downloadDataUrl(item.dataUrl, item.filename);
+			return new Promise(function (resolve) {
+				setTimeout(resolve, 320);
+			}).then(next);
+		}
+		return next();
+	}
+
+	function exportImagePngFiles(node, fullWidth, fullHeight, bg) {
+		var pixelRatio = imageExportTargetPixelRatio();
+		var segmentH = imageExportSegmentCssHeight(pixelRatio);
+		var segments = [];
+		var sy;
+		for (sy = 0; sy < fullHeight; sy += segmentH) {
+			segments.push({
+				y: sy,
+				h: Math.min(segmentH, fullHeight - sy)
+			});
+		}
+
+		var base = slugifyFilename(findDoc(docsState.activeId) && findDoc(docsState.activeId).title);
+		var outputs = [];
+		var chain = Promise.resolve();
+
+		segments.forEach(function (seg, idx) {
+			chain = chain.then(function () {
+				return imageExportSegmentCanvas(node, fullWidth, fullHeight, seg.y, seg.h, pixelRatio, bg).then(function (canvas) {
+					var part = segments.length === 1
+						? base + '.png'
+						: base + '-part-' + String(idx + 1).padStart(2, '0') + '.png';
+					outputs.push({ dataUrl: canvasToPngDataUrl(canvas), filename: part });
+				});
+			});
+		});
+
+		return chain.then(function () {
+			return downloadDataUrlsSequential(outputs).then(function () {
+				return segments.length;
+			});
+		});
+	}
+
 	function exportImage() {
 		var node = document.getElementById('output');
 		if (!node) return;
@@ -2107,23 +2312,27 @@
 
 		var bg = window.getComputedStyle(node).backgroundColor || '#ffffff';
 
+		var fontsReady = document.fonts && document.fonts.ready
+			? document.fonts.ready
+			: Promise.resolve();
+
 		loadScriptOnce(
 			VENDOR + 'html-to-image/html-to-image.js',
 			'htmlToImage'
 		).then(function () {
-			if (!window.htmlToImage || !window.htmlToImage.toPng) {
+			if (!window.htmlToImage || !window.htmlToImage.toCanvas) {
 				throw new Error('html-to-image unavailable');
 			}
-			return window.htmlToImage.toPng(node, {
-				width: fullWidth,
-				height: fullHeight,
-				pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
-				backgroundColor: bg,
-				cacheBust: true
+			return fontsReady.then(function () {
+				return exportImagePngFiles(node, fullWidth, fullHeight, bg);
 			});
-		}).then(function (dataUrl) {
-			var name = slugifyFilename(findDoc(docsState.activeId) && findDoc(docsState.activeId).title) + '.png';
-			downloadDataUrl(dataUrl, name);
+		}).then(function (partCount) {
+			if (partCount > 1) {
+				window.alert(
+					'سند بلند است؛ ' + partCount + ' تصویر PNG با کیفیت بالا دانلود شد (هر بخش حدود ' +
+					Math.round(imageExportSegmentCssHeight(imageExportTargetPixelRatio()) / 1000) + ' هزار پیکسل).'
+				);
+			}
 		}).catch(function () {
 			window.alert('Image export failed. Try again.');
 		}).then(function () {
@@ -2139,6 +2348,9 @@
 		if (format === 'markdown') exportMarkdown();
 		if (format === 'pdf') exportPdf();
 		if (format === 'image') exportImage();
+		if (format === 'docx' && typeof window.rtlmdExportDocx === 'function') {
+			window.rtlmdExportDocx();
+		}
 	}
 
 	function debounce(fn, ms) {
@@ -2303,6 +2515,7 @@
 			}
 			if ((e.ctrlKey || e.metaKey) && e.code === 'KeyN' && !e.shiftKey) {
 				e.preventDefault();
+				if (!confirmLeaveIfDiskDirty()) return;
 				createDoc('# New document\n\n');
 				return;
 			}
@@ -2373,10 +2586,42 @@
 		});
 	}
 
+	function buildRtlmdApi() {
+		return {
+			findDoc: findDoc,
+			docsState: docsState,
+			writeDocs: writeDocs,
+			createDoc: createDoc,
+			loadDocIntoEditor: loadDocIntoEditor,
+			persistActiveFromEditor: persistActiveFromEditor,
+			saveActiveDocToDisk: saveActiveDocToDisk,
+			renderDocList: renderDocList,
+			renderPreview: renderPreview,
+			onEditorChange: onEditorChange,
+			openMarkdownFromDisk: openMarkdownFromDisk,
+			openExternalMarkdownFile: openExternalMarkdownFile,
+			isActiveDocDiskDirty: isActiveDocDiskDirty,
+			canWriteDocToDisk: canWriteDocToDisk,
+			confirmLeaveIfDiskDirty: confirmLeaveIfDiskDirty,
+			titleFromContent: titleFromContent,
+			slugifyFilename: slugifyFilename,
+			downloadFile: downloadFile,
+			uid: uid,
+			UNTITLED: UNTITLED,
+			getEditor: function () { return $editor; },
+			getContentDir: function () { return contentDir; },
+			parseMarkdown: parseMarkdown,
+			applyMdTool: applyMdTool
+		};
+	}
+
 	$(document).ready(function () {
 		bindEditorEvents();
 		initUI();
 		initDesktopBridge();
+		if (typeof window.initRtlmdExtras === 'function') {
+			window.initRtlmdExtras(buildRtlmdApi());
+		}
 		loadInitialContent();
 		initPwaInstall();
 		registerServiceWorker();

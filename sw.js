@@ -1,6 +1,6 @@
 'use strict';
 
-var CACHE_NAME = 'rtlmd-v4';
+var CACHE_NAME = 'rtlmd-v5';
 var PRECACHE = [
 	'./',
 	'./index.html',
@@ -8,6 +8,9 @@ var PRECACHE = [
 	'./manifest.webmanifest',
 	'./app/css/style.css',
 	'./app/js/rtlmd.js',
+	'./app/js/rtlmd-extras.js',
+	'./assets/vendor/katex/katex.min.js',
+	'./assets/vendor/katex/katex.min.css',
 	'./assets/brand/karnoweb-logo.png',
 	'./assets/jquery/dist/jquery.min.js',
 	'./assets/marked/marked.min.js',

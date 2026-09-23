@@ -1,7 +1,7 @@
 {
   "name": "markdown-tools",
   "productName": "Markdown Tools",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "RTL Markdown editor with live preview and export",
   "author": "karnoweb",
   "license": "MIT",
@@ -27,6 +27,7 @@
     "electron": "35.1.5",
     "electron-builder": "25.1.8",
     "html-to-image": "1.11.11",
+    "katex": "^0.16.11",
     "mermaid": "11.4.0",
     "prismjs": "1.29.0",
     "rcedit": "^4.0.1",
