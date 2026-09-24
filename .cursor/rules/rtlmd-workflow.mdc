@@ -1,0 +1,64 @@
+---
+description: Dev & production workflow for rtlmd (split sources, bundles, SW cache, testing)
+alwaysApply: true
+---
+
+# rtlmd — Development & Production Rules
+
+Static PWA + Electron app. App sources are split; runtime loads bundles.
+
+## JS: edit sources, never the bundle
+
+- Edit ONLY `app/js/src/core/*.js` and `app/js/src/extras/*.js`.
+- NEVER hand-edit `app/js/rtlmd.bundle.js`.
+- Local dev: keep `npm run watch:js` running (`scripts/watch-js.mjs` rebuilds
+  the bundle on every save) — then the loop is just save → refresh browser.
+- Without the watcher (or before commit/release): `npm run build:js`.
+- The builder (`scripts/build-js-bundle.mjs`) concatenates core→extras
+  alphabetically, wraps in one IIFE, runs `node --check`, and FAILS on
+  duplicate top-level functions.
+- The bundle is committed: the app must run straight from git, no build needed.
+- No ES `import/export` at runtime (Electron uses `loadFile` = `file://`;
+  modules are CORS-blocked). Classic scripts only; lazy-load via injected
+  `<script>` tags (same-origin, SW-precached), like `ensureWordBundle()`.
+- No duplicated helpers: shared code lives ONCE (e.g. storage helpers in
+  `core/10-markdown.js`). extras talk to core via `window.rtlmd*` hooks +
+  the `rtlmdApi` object built in `core/90-boot.js` — keep that contract.
+
+## CSS: 9 split sheets, order matters
+
+- `app/css/00-tokens-base.css` … `08-settings.css`. Keep `<link>` order in
+  `index.html` numeric — cascade depends on it.
+- `00-*` must stay FIRST: its first line is the fonts `@import`, which is only
+  valid at the top of its sheet.
+
+## Cache discipline (web + PWA)
+
+- After changing CSS/JS, bump `?v=` in `index.html`.
+- Every new local asset MUST be added to `PRECACHE` in `sw.js` AND `CACHE_NAME`
+  bumped (`rtlmd-vN`) — otherwise installed PWAs never receive it.
+- Test with a fresh `?cb=xxx` buster: a stale cached 301 (`/ → /fa` from an old
+  server config) can masquerade as a server bug. `?cb=` bypasses it.
+
+## Build & release
+
+- New build steps go into the `vendor` chain in `package.json`
+  (`pack`/`dist` depend on it). Always `npm run vendor` before packaging.
+- `node_modules/`, `dist/`, `.build/` are gitignored; generated bundles ship.
+
+## Verification (do this before calling anything done)
+
+1. `npm run build:js` passes (syntax gate + dup guard).
+2. Browser smoke on `http://rtlmd.test/?cb=xxx`: full render, all
+   `window.rtlmd*` hooks = `function`, TOC builds, find panel, settings dialog,
+   REAL `window.rtlmdExportDocx()` path (button disables → re-enables, no alert).
+3. `?selfcheck=1` → no failure alert (exercises titles, escape, DOMPurify
+   sanitize, Word-HTML builder, scroll-sync ranges).
+4. New/changed assets all return HTTP 200.
+5. If structure changed, update the file list note at the end of `PRD.md`.
+
+## Refactor discipline
+
+Mechanical moves only: every source line must land in exactly one new home
+(conservation), no behavior change, no new features smuggled in. Confirm with
+the user before changing runtime behavior or the file layout.

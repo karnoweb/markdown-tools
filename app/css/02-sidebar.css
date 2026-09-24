@@ -1,0 +1,258 @@
+/* ── 02-sidebar.css ──
+   App shell, sidebar, document list, doc-item actions. */
+.app-shell {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  height: calc(100vh - 3.25rem);
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.sidebar {
+  width: 16.5rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: oklch(var(--b2));
+  border: 1px solid oklch(var(--b3));
+  border-radius: 0.75rem;
+  overflow: hidden;
+  transition: width 0.2s ease, opacity 0.2s ease, border-color 0.2s ease;
+}
+
+html.sidebar-collapsed .sidebar {
+  width: 0;
+  opacity: 0;
+  border-width: 0;
+  pointer-events: none;
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid oklch(var(--b3));
+  flex-shrink: 0;
+}
+
+.sidebar-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.sidebar-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: oklch(var(--bc) / 0.72);
+}
+
+.doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.doc-item {
+  display: flex;
+  align-items: stretch;
+  gap: 0.15rem;
+  border-radius: 0.55rem;
+  margin-bottom: 0.25rem;
+}
+
+.doc-item.is-active {
+  background: oklch(var(--p) / 0.14);
+}
+
+.doc-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border: none;
+  border-radius: 0.55rem;
+  background: transparent;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.doc-open:hover {
+  background: oklch(var(--b3) / 0.55);
+}
+
+.doc-item.is-active .doc-open:hover {
+  background: transparent;
+}
+
+.doc-title {
+  width: 100%;
+  font-size: 0.86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-meta {
+  font-size: 0.7rem;
+  opacity: 0.55;
+  font-family: var(--rtlmd-mono);
+}
+
+.doc-actions {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0.2rem 0.25rem 0.2rem 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.doc-item:hover .doc-actions,
+.doc-item:focus-within .doc-actions,
+.doc-item.is-active .doc-actions,
+.doc-item.is-pinned .doc-actions {
+  opacity: 1;
+}
+
+.doc-item.is-pinned .doc-title::before {
+  content: "";
+  display: inline-block;
+  width: 0.45em;
+  height: 0.45em;
+  margin-inline-end: 0.4em;
+  border-radius: 50%;
+  background: oklch(var(--p));
+  vertical-align: 0.1em;
+}
+
+.doc-delete:disabled,
+.doc-delete.is-locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.icon-btn-xs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: oklch(var(--bc) / 0.65);
+  cursor: pointer;
+  line-height: 0;
+  font-size: 0.85rem;
+}
+
+.icon-btn-xs svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.icon-btn-xs:hover {
+  background: oklch(var(--b3));
+  color: oklch(var(--bc));
+}
+
+.toc-toggle-btn.is-active {
+  background: oklch(var(--b3));
+  color: oklch(var(--p));
+}
+
+.toc-toggle-btn.hidden {
+  display: none;
+}
+
+.doc-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.doc-pin.is-pinned {
+  color: oklch(var(--p));
+}
+
+.doc-pin svg {
+  display: block;
+}
+
+.doc-new-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 0.4rem;
+  background: oklch(var(--p));
+  color: oklch(var(--pc));
+}
+
+.doc-new-btn:hover {
+  background: oklch(var(--pf));
+  color: oklch(var(--pc));
+}
+
+.doc-new-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.doc-open-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 0.4rem;
+  background: oklch(var(--b3));
+  color: oklch(var(--bc));
+}
+
+.doc-open-btn:hover {
+  background: oklch(var(--p) / 0.22);
+  color: oklch(var(--p));
+}
+
+.doc-open-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.doc-delete:hover {
+  color: oklch(var(--er));
+}
+
+.doc-empty {
+  margin: 1rem 0.85rem;
+  font-size: 0.82rem;
+  opacity: 0.55;
+  text-align: center;
+}
+
+.doc-empty.hidden {
+  display: none;
+}
+
+.mobile-view-toggle {
+  display: none;
+}

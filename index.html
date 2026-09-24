@@ -52,7 +52,15 @@
 		<link id="prism-theme" href="assets/vendor/prism/themes/prism-tomorrow.min.css" rel="stylesheet">
 		<link href="assets/vendor/tailwind.css" rel="stylesheet">
 		<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
-		<link rel="stylesheet" href="app/css/style.css?v=11">
+		<link rel="stylesheet" href="app/css/00-tokens-base.css?v=1">
+		<link rel="stylesheet" href="app/css/01-appbar.css?v=1">
+		<link rel="stylesheet" href="app/css/02-sidebar.css?v=1">
+		<link rel="stylesheet" href="app/css/03-editor.css?v=1">
+		<link rel="stylesheet" href="app/css/04-fullview.css?v=1">
+		<link rel="stylesheet" href="app/css/05-preview.css?v=1">
+		<link rel="stylesheet" href="app/css/06-responsive.css?v=1">
+		<link rel="stylesheet" href="app/css/07-components.css?v=1">
+		<link rel="stylesheet" href="app/css/08-settings.css?v=1">
 	</head>
 	<body>
 		<header id="header" class="app-bar">
@@ -219,7 +227,7 @@
 							<button type="button" class="btn btn-xs btn-ghost" data-export="markdown" title="Download Markdown">Markdown</button>
 							<button type="button" class="btn btn-xs btn-ghost" data-export="pdf" title="Print or save as PDF">PDF</button>
 							<button type="button" class="btn btn-xs btn-ghost" data-export="image" title="Download PNG (high resolution)">Image</button>
-							<button type="button" class="btn btn-xs btn-ghost" data-export="docx" title="Download Word document" data-i18n="exportDocx">Word</button>
+							<button type="button" class="btn btn-xs btn-ghost" data-export="docx" title="Download Word document (.docx)" data-i18n="exportDocx">Word (.docx)</button>
 						</div>
 					</div>
 					<div id="front-matter-banner" class="front-matter-banner hidden"></div>
@@ -257,6 +265,7 @@
 		</dialog>
 
 		<script src="assets/marked/marked.min.js"></script>
+		<script src="assets/vendor/dompurify/purify.min.js"></script>
 		<script src="assets/jquery/dist/jquery.min.js"></script>
 		<script src="assets/vendor/prism/prism.min.js"></script>
 		<script src="assets/vendor/prism/components/prism-clike.min.js"></script>
@@ -272,7 +281,6 @@
 		<script src="assets/vendor/mermaid/mermaid.min.js"></script>
 		<script src="assets/vendor/html-to-image/html-to-image.js"></script>
 		<script src="assets/vendor/katex/katex.min.js"></script>
-		<script src="app/js/rtlmd.js?v=13"></script>
-		<script src="app/js/rtlmd-extras.js?v=2"></script>
+		<script src="app/js/rtlmd.bundle.js?v=3"></script>
 	</body>
 </html>

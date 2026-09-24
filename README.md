@@ -14,7 +14,7 @@ RTL Markdown editor with live preview — built for [karnoweb.ir](https://karnow
 - Side-by-side edit and preview (RTL / LTR)
 - Karnoweb brand themes (Pro Dark / Pro Light)
 - Code highlighting (Prism), copyable code blocks, and diagrams (Mermaid)
-- Export: HTML, Markdown, PDF, image (PNG), Word (.doc)
+- Export: HTML, Markdown, PDF, image (PNG), Word (.docx)
 - **Web**: PWA with offline cache (via Laragon or any static host)
 - **Desktop**: Electron builds for Windows, Linux, and macOS
 

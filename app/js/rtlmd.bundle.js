@@ -1,5 +1,13 @@
+/* Markdown Tools — generated bundle. DO NOT EDIT BY HAND.
+ * Built by `npm run build:js` (scripts/build-js-bundle.mjs).
+ * Edit the sources under app/js/src/{core,extras}/ and rebuild.
+ */
 (function () {
-	'use strict';
+'use strict';
+
+/* ===== src: app/js/src/core/00-constants.js ===== */
+/* ── 00-constants.js ──
+   Storage keys, vendor paths, theme/lang tables, tiny utils (normalizeLang, escapeHtml), content direction state. */
 
 	var INIT_URL = 'initcontent.md';
 	var STORAGE_KEY = 'rtlmd-content';
@@ -86,6 +94,9 @@
 		return ' dir="' + contentDir + '"';
 	}
 
+/* ===== src: app/js/src/core/10-markdown.js ===== */
+/* ── 10-markdown.js ──
+   marked renderers, DOMPurify config, parseMarkdown(), storage helpers, theme-resolution helpers. */
 	var renderer = new marked.Renderer();
 
 	renderer.heading = function (text, level) {
@@ -159,11 +170,43 @@
 		breaks: false
 	});
 
+	/* Security: marked() passes raw HTML typed by the document author straight through
+	   (by design — that's how <br>, embedded images, etc. keep working). If the *content*
+	   comes from an untrusted source (a shared/downloaded .md file, a pasted snippet, …),
+	   that raw HTML can carry <script>, on*="" handlers, or javascript: URLs. Every render
+	   pass is sanitized with DOMPurify using an explicit allow-list matched to exactly what
+	   this app's renderer/preprocessors emit — nothing more. */
+	var MD_SANITIZE_CONFIG = {
+		ALLOWED_TAGS: [
+			'p', 'br', 'hr', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+			'strong', 'em', 'del', 's', 'a', 'span', 'div',
+			'ul', 'ol', 'li', 'blockquote', 'pre', 'code',
+			'table', 'thead', 'tbody', 'tr', 'th', 'td',
+			'img', 'input'
+		],
+		ALLOWED_ATTR: [
+			'dir', 'class', 'href', 'title', 'alt', 'src', 'style',
+			'type', 'checked', 'disabled', 'id', 'target', 'rel',
+			'role', 'aria-label', 'aria-hidden', 'tabindex'
+		],
+		ALLOW_DATA_ATTR: true
+	};
+
+	function sanitizeMarkdownHtml(html) {
+		if (typeof window.DOMPurify === 'undefined' || typeof window.DOMPurify.sanitize !== 'function') {
+			/* ponytail: fail closed — if the sanitizer failed to load, never show
+			   unsanitized HTML; fall back to plain escaped text instead. */
+			return escapeHtml(String(html || ''));
+		}
+		return window.DOMPurify.sanitize(String(html || ''), MD_SANITIZE_CONFIG);
+	}
+
 	function parseMarkdown(src) {
 		if (typeof window.rtlmdPreprocessMarkdown === 'function') {
 			src = window.rtlmdPreprocessMarkdown(src);
 		}
 		var html = marked.parse(src);
+		html = sanitizeMarkdownHtml(html);
 		if (typeof window.rtlmdPostprocessMarkdownHtml === 'function') {
 			html = window.rtlmdPostprocessMarkdownHtml(html, src);
 		}
@@ -190,7 +233,16 @@
 	function storageSet(key, val) {
 		try {
 			localStorage.setItem(key, val);
-		} catch (e) { /* ponytail: quota/private mode */ }
+			return true;
+		} catch (e) {
+			/* ponytail: quota exceeded or private-mode storage block — the caller MUST
+			   check this return value. Silently swallowing this here (as before) made
+			   writeDocs() believe a failed save had succeeded, risking silent data loss. */
+			if (window.console && console.warn) {
+				console.warn('[rtlmd] localStorage write failed for key "' + key + '":', e);
+			}
+			return false;
+		}
 	}
 
 	function isDarkTheme(theme) {
@@ -221,6 +273,9 @@
 		return isDarkTheme(resolveTheme(getThemePref())) ? 'dark' : 'default';
 	}
 
+/* ===== src: app/js/src/core/20-code-mermaid.js ===== */
+/* ── 20-code-mermaid.js ──
+   Code bidi enhancement, Prism highlight, mermaid render + zoom/toolbar + fullscreen. */
 	/* Persian/Arabic runs; spaces only when next char is also Arabic (keeps Latin tokens out) */
 	var BIDI_RUN_RE = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF](?:[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200c\u200d،؛؟:!.,…]|\s+(?=[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]))*/g;
 
@@ -478,6 +533,9 @@
 		});
 	}
 
+/* ===== src: app/js/src/core/30-view-state.js ===== */
+/* ── 30-view-state.js ──
+   Theme, direction, font size, full-view, scroll-sync engine, sidebar, mobile view. */
 	function applyTheme(pref) {
 		var resolved = resolveTheme(pref);
 		document.documentElement.setAttribute('data-theme', resolved);
@@ -853,6 +911,10 @@
 	}
 
 	/* ── Document history (localStorage) ───────────────── */
+
+/* ===== src: app/js/src/core/40-docs.js ===== */
+/* ── 40-docs.js ──
+   Document history store, File System Access handles, open/save to disk, list UI, bootstrap. */
 	var docsState = { items: [], activeId: null };
 
 	function normalizeSourcePath(sourcePath) {
@@ -1209,13 +1271,27 @@
 
 	function writeDocs(items) {
 		docsState.items = items;
+		var serialized;
 		try {
-			storageSet(DOCS_KEY, JSON.stringify(items));
-			return true;
+			serialized = JSON.stringify(items);
 		} catch (e) {
-			window.alert('Could not save history (browser storage may be full).');
+			window.alert('Could not save history (document data could not be serialized).');
 			return false;
 		}
+		/* P0 fix: storageSet() used to swallow quota/private-mode errors internally, and
+		   this function never actually checked for failure — it just returned true
+		   unconditionally, so a full-storage save looked "successful" while nothing was
+		   actually persisted. The in-memory edit is still safe in docsState.items above,
+		   but the caller must know a reload/close will lose it. */
+		var saved = storageSet(DOCS_KEY, serialized);
+		if (!saved) {
+			var msg = typeof window.rtlmdT === 'function'
+				? window.rtlmdT('storageFullWarning')
+				: 'Browser storage is full — this change was NOT saved. Delete old documents/large pasted images, or export a backup, then try again.';
+			window.alert(msg);
+			return false;
+		}
+		return true;
 	}
 
 	function sortDocs(items) {
@@ -1691,6 +1767,9 @@
 		});
 	}
 
+/* ===== src: app/js/src/core/50-selfcheck.js ===== */
+/* ── 50-selfcheck.js ──
+   ?selfcheck=1 regression guards (titles, escape, sanitize, word export…). */
 	function runDocsSelfCheck() {
 		var fails = [];
 		function ok(cond, msg) {
@@ -1718,8 +1797,41 @@
 		ok(escapeHtml('<?php $t->id()') === '&lt;?php $t-&gt;id()', 'escape php fence');
 		ok(parseMarkdown('```php\n<?php\n$table->id();\n```').indexOf('&lt;?php') !== -1, 'php fence stays text');
 		ok(parseMarkdown('```php\n<?php\n$table->id();\n```').indexOf('language-php"><code') === -1, 'php fence no nest leak');
-		ok(parseMarkdown("x `'y'` z").indexOf('&amp;#39;') === -1, 'codespan no double-escape');
-		ok(parseMarkdown("x `'y'` z").indexOf("&#39;y&#39;") !== -1, 'codespan keeps quotes');
+		(function () {
+			var html = parseMarkdown("x `'y'` z");
+			ok(html.indexOf('&amp;#39;') === -1 && html.indexOf('&amp;amp;') === -1, 'codespan no double-escape');
+			var probe = document.createElement('div');
+			probe.innerHTML = html;
+			var codeEl = probe.querySelector('code.codespan');
+			ok(!!codeEl && codeEl.textContent === "'y'", 'codespan keeps quotes');
+		})();
+		(function () {
+			/* Regression guard: a literal `$$...$$`/`$...$` shown as *code* (explaining
+			   KaTeX/shell syntax, prices in a code sample, etc.) must stay literal text —
+			   not be treated as real math — and must never corrupt/truncate the rest of
+			   the document (reported real-world case: pasting a message that contained
+			   `` `$$E=mc^2$$` `` inside a sentence blanked out everything after it). */
+			var html = parseMarkdown(
+				'before (`$$E=mc^2$$`, `$a+b$`) after\n\n' +
+				'```\ncode with $$still not math$$ and $1 too\n```\n\n' +
+				'tail paragraph stays visible'
+			);
+			ok(html.indexOf('katex') === -1, 'code-fenced/code-span $ is not treated as math');
+			ok(html.indexOf('rtlmd-math-ph') === -1, 'no leftover math placeholder markers');
+			ok(html.indexOf('tail paragraph stays visible') !== -1, 'content after inline code with $ is not swallowed');
+		})();
+		(function () {
+			/* P0 security regression guard: untrusted raw HTML in a document (e.g. a
+			   downloaded/shared .md file) must never reach the live DOM unsanitized. */
+			var html = parseMarkdown(
+				'<script>window.__rtlmdXssProbe = 1;<\/script>\n\n' +
+				'![x](javascript:alert(1))\n\n' +
+				'<img src="x" onerror="window.__rtlmdXssProbe = 1">'
+			);
+			ok(html.indexOf('<script') === -1, 'sanitize strips <script> tags');
+			ok(html.indexOf('onerror') === -1, 'sanitize strips inline event-handler attributes');
+			ok(html.indexOf('javascript:') === -1, 'sanitize strips javascript: URIs');
+		})();
 		(function () {
 			var el = document.createElement('code');
 			el.textContent = "'این سند خرید' and $x";
@@ -1732,6 +1844,14 @@
 		ok(typeof setScrollSync === 'function' && scrollSyncOn === (storageGet(SCROLL_SYNC_KEY, '0') === '1'), 'scroll sync default wiring');
 		var ranges = sourceBlockRanges('# Title\n\nHello\n');
 		ok(ranges.length === 2 && ranges[0].start === 1 && ranges[1].start === 3, 'scroll sync block ranges');
+		(function () {
+			/* Word export guard: the .doc payload must be self-contained and styled. */
+			var w = buildWordDocument('Selfcheck');
+			ok(w.indexOf('<style>') !== -1 && w.indexOf('.markdown-body h1') !== -1, 'word export embeds stylesheet');
+			ok(w.indexOf('WordSection1') !== -1, 'word export has Word section/page setup');
+			ok(w.indexOf('<script') === -1, 'word export strips scripts');
+			ok(w.indexOf('code-copy') === -1 && w.indexOf('code-lang') === -1, 'word export strips preview-only code chrome');
+		})();
 		if (fails.length) {
 			console.error('[rtlmd selfcheck] FAIL', fails);
 			window.alert('Self-check failed: ' + fails.join(', '));
@@ -1740,6 +1860,9 @@
 		}
 	}
 
+/* ===== src: app/js/src/core/60-editor-preview.js ===== */
+/* ── 60-editor-preview.js ──
+   Editor binding base, renderPreview() pipeline, code copy buttons, clipboard. */
 	var $editor = null;
 	var rafPending = false;
 
@@ -1812,6 +1935,9 @@
 		});
 	}
 
+/* ===== src: app/js/src/core/70-toolbar.js ===== */
+/* ── 70-toolbar.js ──
+   Markdown toolbar actions (bold, lists, table, task…). */
 	function wrapSelection(selected, before, after) {
 		return before + (selected || '') + after;
 	}
@@ -1898,6 +2024,9 @@
 		});
 	}
 
+/* ===== src: app/js/src/core/80-export.js ===== */
+/* ── 80-export.js ──
+   Standalone exports: HTML/Markdown/PDF/image, Word-HTML (.doc) builder, editor change loop. */
 	function saveContent() {
 		persistActiveFromEditor({ silentList: true });
 		var doc = findDoc(docsState.activeId);
@@ -2030,6 +2159,154 @@
 				'}'
 			].join('') : ''
 		].join('');
+	}
+
+	/* ponytail: Word (.doc) export — Word-HTML with embedded styles.
+	   Unlike the live preview (tailwind/daisyui classes), the .doc file must be
+	   self-contained: Word has no access to the app CSS, understands only a
+	   subset of CSS (no logical properties, no :not(), no flex), and prints
+	   dark code themes badly — so this ships a dedicated light, print-safe
+	   stylesheet plus Word section/page metadata. */
+	function wordStylesheet() {
+		var rtl = contentDir === 'rtl';
+		var listSide = rtl ? 'margin-right:1.6em;margin-left:0' : 'margin-left:1.6em;margin-right:0';
+		var quoteBorder = rtl ? 'border-right:4px solid #93c5fd' : 'border-left:4px solid #93c5fd';
+		var quotePad = rtl ? 'padding:.45em 1em .45em 0' : 'padding:.45em 0 .45em 1em';
+		/* ponytail: explicit physical alignment — Word maps h1-h6 to its built-in
+		   Heading styles (left-aligned), so without this RTL headings fall back
+		   to left while body paragraphs follow dir. Applied on the container for
+		   inheritance plus directly on headings to beat the built-in styles. */
+		var baseAlign = rtl ? 'text-align:right' : 'text-align:left';
+		return [
+			'@page WordSection1{size:595.3pt 841.9pt;margin:72pt 72pt 72pt 72pt;mso-header-margin:35.4pt;mso-footer-margin:35.4pt}',
+			'div.WordSection1{page:WordSection1}',
+			'body{margin:0;padding:0;font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-size:11pt;line-height:1.8;color:#18181b;background:#fff;direction:' + contentDir + ';mso-bidi-font-family:Tahoma}',
+			'.markdown-body{max-width:100%;margin:0;overflow-wrap:break-word;word-wrap:break-word;' + baseAlign + '}',
+			'.markdown-body h1,.markdown-body h2,.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6{font-family:Vazirmatn,Tahoma,Arial,sans-serif;font-weight:700;line-height:1.4;margin:1.2em 0 .5em;color:#18181b;mso-bidi-font-weight:bold;page-break-after:avoid;' + baseAlign + '}',
+			'.markdown-body h1{font-size:20pt;padding-bottom:.25em;border-bottom:2px solid #e4e4e7}',
+			'.markdown-body h2{font-size:16pt;padding-bottom:.2em;border-bottom:1px solid #e4e4e7}',
+			'.markdown-body h3{font-size:13pt}',
+			'.markdown-body h4{font-size:11.5pt}',
+			'.markdown-body h5,.markdown-body h6{font-size:11pt}',
+			'.markdown-body p{margin:0 0 1em}',
+			'.markdown-body ul,.markdown-body ol{margin:0 0 1em;' + listSide + ';padding:0}',
+			'.markdown-body li{margin-bottom:.35em}',
+			'.markdown-body a{color:#2563eb;text-decoration:underline}',
+			'.markdown-body blockquote{margin:0 0 1em;' + quotePad + ';' + quoteBorder + ';color:#334155;background:#f8fafc}',
+			'.markdown-body hr{border:none;border-top:1px solid #cbd5e1;margin:1.5em 0}',
+			'.markdown-body img{max-width:100%;height:auto}',
+			'.markdown-body table{width:100%;margin:0 0 1em;border-collapse:collapse;font-size:10pt;border:1.5pt solid #94a3b8;background:#fff}',
+			'.markdown-body th,.markdown-body td{padding:6pt 8pt;border:1pt solid #94a3b8;vertical-align:top}',
+			'.markdown-body th{font-weight:700;background:#e2e8f0;mso-shading:rgb(226,232,240)}',
+			'.markdown-body tbody tr{background:#fff}',
+			/* inline code — simple selector on purpose (Word ignores :not()) */
+			'.markdown-body code{font-family:Consolas,"Courier New",monospace;font-size:9.5pt;color:#3f3f46;background:#f4f4f5;border:1pt solid #d4d4d8}',
+			'.markdown-body pre{margin:.7em 0 1em;padding:10pt 12pt;background:#f4f4f5;border:1pt solid #cbd5e1;line-height:1.55;white-space:pre-wrap;word-wrap:break-word;text-align:left;direction:ltr}',
+			'.markdown-body pre code{font-family:Consolas,"Courier New",monospace;font-size:9.5pt;color:#18181b;background:transparent;border:none}',
+			/* neutralize dark prism token colors — Word file ships no prism theme */
+			'.markdown-body .token{color:#18181b!important;background:transparent!important}',
+			'.markdown-body .code-bidi{font-family:Vazirmatn,Tahoma,Arial,sans-serif}',
+			'.markdown-body .mermaid-wrap{margin:0 0 1em;padding:10pt;border:1pt solid #cbd5e1;background:#f8fafc;text-align:center}',
+			'.markdown-body .mermaid-wrap svg{max-width:100%;height:auto}',
+			'.markdown-body .katex{font-size:1em}',
+			'.markdown-body input{vertical-align:middle}'
+		].join('');
+	}
+
+	function resolveWordUrl(url) {
+		if (!url || url.charAt(0) === '#') return url;
+		if (/^(data|blob|https?|file|ftp|mailto):/i.test(url)) return url;
+		try {
+			if (typeof location !== 'undefined' && location.href) return new URL(url, location.href).href;
+		} catch (e) { /* keep original */ }
+		return url;
+	}
+
+	/* Strip preview-only / interactive nodes and make resource URLs absolute so the
+	   downloaded .doc renders away from the app (Word resolves relative URLs
+	   against the local file, which would break images/links). */
+	function sanitizeWordClone(root) {
+		var i, j, nodes;
+		nodes = root.querySelectorAll('script,style,button,.code-copy,.code-lang,.mermaid-toolbar,.preview-toc,.toc-toggle-btn');
+		for (i = 0; i < nodes.length; i++) {
+			if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+		}
+		/* mermaid: drop zoom toolbar/viewport wrappers, keep the rendered svg */
+		nodes = root.querySelectorAll('.mermaid-wrap');
+		for (i = 0; i < nodes.length; i++) {
+			var wrap = nodes[i];
+			wrap.removeAttribute('data-mermaid-enhanced');
+			wrap.removeAttribute('data-processed');
+			var svg = wrap.querySelector('svg');
+			if (svg) {
+				wrap.innerHTML = '';
+				wrap.appendChild(svg.cloneNode(true));
+			} else {
+				var stale = wrap.querySelectorAll('.mermaid-viewport,.mermaid-stage');
+				for (j = 0; j < stale.length; j++) {
+					var st = stale[j];
+					while (st.firstChild) st.parentNode.insertBefore(st.firstChild, st);
+					if (st.parentNode) st.parentNode.removeChild(st);
+				}
+			}
+		}
+		/* table-scroll wrapper only makes sense with app CSS overflow — unwrap it */
+		nodes = root.querySelectorAll('.table-scroll');
+		for (i = 0; i < nodes.length; i++) {
+			var box = nodes[i];
+			while (box.firstChild) box.parentNode.insertBefore(box.firstChild, box);
+			if (box.parentNode) box.parentNode.removeChild(box);
+		}
+		nodes = root.querySelectorAll('img');
+		for (i = 0; i < nodes.length; i++) {
+			var img = nodes[i];
+			try {
+				var src = img.getAttribute('src');
+				if (src) img.setAttribute('src', resolveWordUrl(src));
+			} catch (e) { /* keep */ }
+			img.removeAttribute('srcset');
+			img.removeAttribute('sizes');
+			img.removeAttribute('loading');
+		}
+		nodes = root.querySelectorAll('a');
+		for (i = 0; i < nodes.length; i++) {
+			try {
+				var href = nodes[i].getAttribute('href');
+				if (href && href.charAt(0) !== '#') nodes[i].setAttribute('href', resolveWordUrl(href));
+			} catch (e) { /* keep */ }
+		}
+		nodes = root.querySelectorAll('[contenteditable],[draggable],[spellcheck]');
+		for (i = 0; i < nodes.length; i++) {
+			nodes[i].removeAttribute('contenteditable');
+			nodes[i].removeAttribute('draggable');
+			nodes[i].removeAttribute('spellcheck');
+		}
+		return root;
+	}
+
+	function buildWordDocument(title) {
+		var root = sanitizeWordClone(prepareExportRoot());
+		var dir = contentDir;
+		var pageLang = (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) || 'fa';
+		var safeTitle = escapeHtml(title || 'Markdown Tools');
+		return '<!DOCTYPE html>' +
+			'<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
+			'xmlns:w="urn:schemas-microsoft-com:office:word" ' +
+			'xmlns="http://www.w3.org/TR/REC-html40" lang="' + pageLang + '" dir="' + dir + '">' +
+			'<head><meta charset="utf-8">' +
+			'<meta http-equiv="Content-Type" content="text/html; charset=utf-8">' +
+			'<meta name="ProgId" content="Word.Document">' +
+			'<meta name="Generator" content="Markdown Tools">' +
+			'<title>' + safeTitle + '</title>' +
+			'<style>' + wordStylesheet() + '</style>' +
+			'<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View>' +
+			'<w:DoNotHyphenateCaps/>' +
+			'<w:Compatibility><w:BreakWrappedTables/><w:SnapToGridInCell/>' +
+			'<w:WrapTextWithPunct/><w:UseAsianBreakRules/></w:Compatibility>' +
+			'</w:WordDocument></xml><![endif]-->' +
+			'</head><body><div class="WordSection1"><div class="markdown-body" dir="' + dir + '">' +
+			root.innerHTML +
+			'</div></div></body></html>';
 	}
 
 	function exportHeadAssets(needsPrism) {
@@ -2458,6 +2735,9 @@
 			});
 	}
 
+/* ===== src: app/js/src/core/90-boot.js ===== */
+/* ── 90-boot.js ──
+   Global shortcuts, PWA install, service worker, public api object, startup. */
 	function initUI() {
 		migratePrefsOnce();
 		initTheme();
@@ -2606,6 +2886,7 @@
 			titleFromContent: titleFromContent,
 			slugifyFilename: slugifyFilename,
 			downloadFile: downloadFile,
+			buildWordDocument: buildWordDocument,
 			uid: uid,
 			UNTITLED: UNTITLED,
 			getEditor: function () { return $editor; },
@@ -2626,4 +2907,939 @@
 		initPwaInstall();
 		registerServiceWorker();
 	});
+
+/* ===== src: app/js/src/extras/00-vars.js ===== */
+/* ── 00-vars.js ──
+   Shared module state (api handle) + localStorage keys. */
+
+	var api = null;
+	var LANG_KEY = 'rtlmd-lang';
+	var SPELL_KEY = 'rtlmd-spellcheck';
+	var AUTOSAVE_KEY = 'rtlmd-autosave-disk';
+	var TOC_KEY = 'rtlmd-toc';
+	var LINE_NUM_KEY = 'rtlmd-line-numbers';
+	var MAX_SNAPSHOTS = 15;
+	var mathPlaceholders = [];
+
+/* ===== src: app/js/src/extras/10-i18n.js ===== */
+/* ── 10-i18n.js ──
+   en/fa string packs, lang()/t(), window.rtlmdT hook, document templates. */
+	var STR = {
+		en: {
+			files: 'Files', editor: 'Editor', preview: 'Preview', editTab: 'Edit',
+			searchDocs: 'Search documents…', openFolder: 'Open folder', backupExport: 'Export backup',
+			backupImport: 'Import backup', newFromTemplate: 'New from template', settings: 'Settings',
+			find: 'Find', replace: 'Replace', findNext: 'Next', findPrev: 'Previous', replaceOne: 'Replace',
+			replaceAll: 'Replace all', close: 'Close', toc: 'Contents', wordCount: 'words',
+			charCount: 'chars', readTime: 'min read', unsavedDiskLeave: 'This file has unsaved changes on disk. Leave anyway?',
+			snapshot: 'Snapshot', restoreSnapshot: 'Restore snapshot', spellcheck: 'Spellcheck',
+			autosaveDisk: 'Autosave to disk (linked files)', lineNumbers: 'Line numbers', language: 'Language',
+			langEn: 'English', langFa: 'Persian', templateBlank: 'Blank', templateNote: 'Note',
+			templateMeeting: 'Meeting', templateReadme: 'README', templateReport: 'Report',
+			noSnapshots: 'No snapshots yet.', snapshotSaved: 'Snapshot saved.',
+			duplicate: 'Duplicate', openFile: 'Open file', newDoc: 'New document', save: 'Save',
+			exportDocx: 'Word (.docx)', frontMatter: 'Metadata',
+			wordExportFailed: 'Word export failed. Please try again.',
+			storageFullWarning: 'Browser storage is full — this change was NOT saved. Delete old documents or large pasted images, or export a backup, then try again.'
+		},
+		fa: {
+			files: 'فایل‌ها', editor: 'ویرایشگر', preview: 'پیش‌نمایش', editTab: 'ویرایش',
+			searchDocs: 'جستجو در اسناد…', openFolder: 'باز کردن پوشه', backupExport: 'خروجی پشتیبان',
+			backupImport: 'ورود پشتیبان', newFromTemplate: 'سند از قالب', settings: 'تنظیمات',
+			find: 'جستجو', replace: 'جایگزینی', findNext: 'بعدی', findPrev: 'قبلی', replaceOne: 'جایگزین',
+			replaceAll: 'همه', close: 'بستن', toc: 'فهرست', wordCount: 'کلمه',
+			charCount: 'کاراکتر', readTime: 'دقیقه مطالعه', unsavedDiskLeave: 'تغییرات ذخیره‌نشده روی دیسک دارید. خارج شوید؟',
+			snapshot: 'نسخه', restoreSnapshot: 'بازیابی نسخه', spellcheck: 'املاء',
+			autosaveDisk: 'ذخیره خودکار روی دیسک', lineNumbers: 'شماره خط', language: 'زبان',
+			langEn: 'English', langFa: 'فارسی', templateBlank: 'خالی', templateNote: 'یادداشت',
+			templateMeeting: 'جلسه', templateReadme: 'README', templateReport: 'گزارش',
+			noSnapshots: 'نسخه‌ای نیست.', snapshotSaved: 'نسخه ذخیره شد.',
+			duplicate: 'کپی', openFile: 'باز کردن فایل', newDoc: 'سند جدید', save: 'ذخیره',
+			exportDocx: 'Word (.docx)', frontMatter: 'متادیتا',
+			wordExportFailed: 'خروجی Word ناموفق بود. لطفاً دوباره تلاش کنید.',
+			storageFullWarning: 'فضای ذخیره‌سازی مرورگر پر است — این تغییر ذخیره نشد. چند سند قدیمی یا تصویر بزرگ چسبانده‌شده را حذف کنید یا یک پشتیبان خروجی بگیرید و دوباره تلاش کنید.'
+		}
+	};
+
+	function lang() {
+		return storageGet(LANG_KEY, 'fa') === 'en' ? 'en' : 'fa';
+	}
+
+	function t(key) {
+		var pack = STR[lang()] || STR.en;
+		return pack[key] || STR.en[key] || key;
+	}
+
+	window.rtlmdT = t;
+
+	var TEMPLATES = {
+		blank: '# New document\n\n',
+		note: '# یادداشت\n\n- \n\n',
+		meeting: '# جلسه\n\n**تاریخ:** \n\n**حاضرین:** \n\n## دستور\n\n1. \n\n## تصمیمات\n\n- \n',
+		readme: '# Project\n\n## Overview\n\n## Install\n\n```bash\n\n```\n',
+		report: '# گزارش\n\n## خلاصه\n\n## جزئیات\n\n## نتیجه\n\n'
+	};
+
+/* ===== src: app/js/src/extras/20-math-markdown.js ===== */
+/* ── 20-math-markdown.js ──
+   Front-matter split, KaTeX math placeholders, pre/postprocess hooks. */
+	function splitFrontMatter(src) {
+		var text = String(src || '');
+		if (!/^---\r?\n/.test(text)) return { meta: null, body: text };
+		var m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+		if (!m) return { meta: null, body: text };
+		return { meta: m[1], body: text.slice(m[0].length) };
+	}
+
+	function parseSimpleYaml(yaml) {
+		var out = {};
+		String(yaml || '').split(/\r?\n/).forEach(function (line) {
+			var p = line.match(/^\s*([A-Za-z0-9_-]+)\s*:\s*(.+?)\s*$/);
+			if (p) out[p[1]] = p[2].replace(/^["']|["']$/g, '');
+		});
+		return out;
+	}
+
+	/* Markers use a plain div/span with a data attribute (not an HTML comment) because
+	   the render pipeline now runs everything through DOMPurify before this postprocess
+	   step — and sanitizers strip HTML comments outright (a long-standing IE/mXSS attack
+	   vector), which would silently swallow every math placeholder. */
+	function mathPlaceholderTag(display) {
+		return display ? 'div' : 'span';
+	}
+
+	/* Pre-existing bug (not introduced by the DOMPurify change, just surfaced by it):
+	   the $/$$ math scanner below runs on the *raw* markdown text, before `marked` has
+	   any concept of code spans/fences. So a literal `$$E=mc^2$$` written inside
+	   backticks — to *show* KaTeX syntax as code, exactly like explaining this feature —
+	   got treated as real math. That splices an HTML placeholder tag into the middle of
+	   a backtick span, which corrupts the span for marked's inline lexer and can swallow
+	   most of the remaining document into one broken <code> run (the "half the content
+	   disappeared" symptom). Fenced code blocks and inline code spans must never be
+	   scanned for math, so they're protected (swapped for opaque tokens) first and
+	   restored verbatim afterward. */
+	function protectCodeRegions(text, regex, store) {
+		return text.replace(regex, function (match) {
+			var i = store.length;
+			store.push(match);
+			return '\u0000CODE' + i + '\u0000';
+		});
+	}
+
+	function restoreCodeRegions(text, store) {
+		if (!store.length) return text;
+		return text.replace(/\u0000CODE(\d+)\u0000/g, function (_, idx) {
+			var raw = store[Number(idx)];
+			return raw === undefined ? '' : raw;
+		});
+	}
+
+	var FENCE_RE = /(^|\n)[ \t]{0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]{0,3}\2[ \t]*(?=\n|$)/g;
+	var INLINE_CODE_RE = /(`+)[\s\S]*?\1/g;
+
+	/* Word-boundary test for `**bold**` finishing (below): any letter/number
+	   in any script, plus underscore. Intraword runs like 2**3**4 stay literal. */
+	function isStrongWordChar(ch) {
+		return !!ch && /[\p{L}\p{N}_]/u.test(ch);
+	}
+
+	/* Matches one `**...**` span on the code-PROTECTED source, where inline code
+	   and fences are opaque  tokens (they contain no asterisks, so spans
+	   never open or close inside code). Content may hold code tokens, single
+	   newlines and any non-`*` chars — but no blank line and no nested `*`. */
+	var STRONG_SPAN_RE = /\*\*((?:[^*\n]|\n(?!\n)|[^\0]*\0)+?)\*\*/g;
+
+	function strongSpanHasMultilineCode(inner, codeStore) {
+		var m;
+		var re = /CODE(\d+)/g;
+		while ((m = re.exec(inner))) {
+			var raw = codeStore[Number(m[1])];
+			if (raw !== undefined && raw.indexOf('\n') !== -1) return true;
+		}
+		return false;
+	}
+
+	/* Convert the `**bold**` spans that marked's own tokenizer leaves literal
+	   (e.g. a closer preceded by `)` and followed by `،`) into real <strong>,
+	   eagerly, so preview and Word agree. The inner markdown is parsed with the
+	   real marked pipeline and flows through the normal DOMPurify pass with
+	   everything else — no second sanitizer needed.
+	   Rejected (left for marked, i.e. today's behavior): native `***a***`,
+	   `**a *b* c**`, spans nested inside a rejected outer (the scan re-tries
+	   from just past the rejected opener, so inner pairs still convert),
+	   intraword 2**3**4, escaped \**, spans across blank lines, and spans
+	   swallowing multiline code. */
+	function convertLiteralStrong(body, codeStore) {
+		if (typeof marked === 'undefined' || typeof marked.parseInline !== 'function') return body;
+		if (body.indexOf('**') === -1) return body;
+		var out = '';
+		var pos = 0;
+		var m;
+		STRONG_SPAN_RE.lastIndex = 0;
+		while ((m = STRONG_SPAN_RE.exec(body))) {
+			if (m.index < pos) continue;
+			var inner = m[1];
+			var before = m.index > 0 ? body.charAt(m.index - 1) : '';
+			var afterIdx = m.index + m[0].length;
+			var after = afterIdx < body.length ? body.charAt(afterIdx) : '';
+			var ok = before !== '*' && after !== '*' && before !== '\\' &&
+				!isStrongWordChar(before) && !isStrongWordChar(after) &&
+				!strongSpanHasMultilineCode(inner, codeStore);
+			if (!ok) {
+				STRONG_SPAN_RE.lastIndex = m.index + 2;
+				continue;
+			}
+			out += body.slice(pos, m.index);
+			out += '<strong>' + marked.parseInline(restoreCodeRegions(inner, codeStore)) + '</strong>';
+			pos = afterIdx;
+			STRONG_SPAN_RE.lastIndex = pos;
+		}
+		return out + body.slice(pos);
+	}
+
+	function preprocessMarkdown(src) {
+		mathPlaceholders = [];
+		var parts = splitFrontMatter(src);
+		var body = parts.body;
+
+		/* Order matters: extract whole fenced blocks first so the inline-code regex
+		   below never runs its backtick matching across (or inside) a fence's content. */
+		var codeStore = [];
+		body = protectCodeRegions(body, FENCE_RE, codeStore);
+		body = protectCodeRegions(body, INLINE_CODE_RE, codeStore);
+
+		body = body.replace(/\$\$([\s\S]+?)\$\$/g, function (_, tex) {
+			var i = mathPlaceholders.length;
+			mathPlaceholders.push({ display: true, tex: tex.trim() });
+			return '\n\n<div class="rtlmd-math-ph" data-math-index="' + i + '"></div>\n\n';
+		});
+
+		body = body.replace(/(^|[^\\])\$([^\$\n]+?)\$/g, function (m, pre, tex) {
+			var i = mathPlaceholders.length;
+			mathPlaceholders.push({ display: false, tex: tex.trim() });
+			return pre + '<span class="rtlmd-math-ph" data-math-index="' + i + '"></span>';
+		});
+
+		/* Finish `**bold**` spans marked leaves literal (code is still protected
+		   above, math placeholders are already extracted, so neither is harmed). */
+		body = convertLiteralStrong(body, codeStore);
+
+		/* Put the protected code back exactly as written — never math-processed. */
+		body = restoreCodeRegions(body, codeStore);
+
+		if (parts.meta) {
+			window.__rtlmdFrontMatter = parseSimpleYaml(parts.meta);
+		} else {
+			window.__rtlmdFrontMatter = null;
+		}
+		return body;
+	}
+
+	function renderKatex(tex, display) {
+		if (typeof katex === 'undefined') {
+			return '<code>' + tex.replace(/</g, '&lt;') + '</code>';
+		}
+		try {
+			return katex.renderToString(tex, {
+				displayMode: !!display,
+				throwOnError: false,
+				output: 'html'
+			});
+		} catch (e) {
+			return '<code>' + tex.replace(/</g, '&lt;') + '</code>';
+		}
+	}
+
+	function postprocessMarkdownHtml(html) {
+		if (!mathPlaceholders.length) return html;
+		/* DOM-based replacement (not string/regex matching) so this stays correct no
+		   matter how the sanitizer reorders/re-serializes the placeholder's attributes. */
+		var wrap = document.createElement('div');
+		wrap.innerHTML = html;
+		var placeholders = wrap.querySelectorAll('.rtlmd-math-ph');
+		placeholders.forEach(function (el) {
+			var idx = Number(el.getAttribute('data-math-index'));
+			var item = mathPlaceholders[idx];
+			if (!item) {
+				el.remove();
+				return;
+			}
+			var replacement = document.createElement(mathPlaceholderTag(item.display));
+			replacement.className = item.display ? 'math-block' : 'math-inline';
+			replacement.setAttribute('dir', 'ltr');
+			replacement.innerHTML = renderKatex(item.tex, item.display);
+			el.replaceWith(replacement);
+		});
+		return wrap.innerHTML;
+	}
+
+	window.rtlmdPreprocessMarkdown = preprocessMarkdown;
+	window.rtlmdPostprocessMarkdownHtml = postprocessMarkdownHtml;
+
+/* ===== src: app/js/src/extras/30-content-widgets.js ===== */
+/* ── 30-content-widgets.js ──
+   i18n apply, word count, TOC build/toggle, front-matter banner. */
+	function applyI18n() {
+		document.querySelectorAll('[data-i18n]').forEach(function (el) {
+			var key = el.getAttribute('data-i18n');
+			if (key) el.textContent = t(key);
+		});
+		document.querySelectorAll('[data-i18n-placeholder]').forEach(function (el) {
+			var key = el.getAttribute('data-i18n-placeholder');
+			if (key) el.setAttribute('placeholder', t(key));
+		});
+		document.querySelectorAll('[data-i18n-title]').forEach(function (el) {
+			var key = el.getAttribute('data-i18n-title');
+			if (key) el.setAttribute('title', t(key));
+		});
+		document.documentElement.lang = lang();
+	}
+
+	function countStats(text) {
+		var s = String(text || '');
+		var chars = s.length;
+		var words = (s.trim().match(/[^\s]+/g) || []).length;
+		var mins = Math.max(1, Math.ceil(words / 200));
+		return { words: words, chars: chars, mins: mins };
+	}
+
+	function updateWordCount() {
+		var el = document.getElementById('editor-stats');
+		if (!el || !api) return;
+		var ed = api.getEditor();
+		var text = ed && ed.length ? ed.val() : '';
+		var st = countStats(text);
+		el.textContent = st.words + ' ' + t('wordCount') + ' · ' + st.chars + ' ' + t('charCount') +
+			' · ~' + st.mins + ' ' + t('readTime');
+	}
+
+	function tocEnabledInSettings() {
+		return storageGet(TOC_KEY, '1') !== '0';
+	}
+
+	function syncTocVisibility() {
+		var nav = document.getElementById('preview-toc');
+		if (!nav) return;
+		var toggleBtn = document.getElementById('toc-toggle');
+		var full = document.body.classList.contains('fullview');
+		var hasList = !!nav.querySelector('.toc-list');
+		var show = full && tocEnabledInSettings() && hasList;
+		nav.classList.toggle('hidden', !show);
+		if (toggleBtn) {
+			var canToggle = full && hasList;
+			toggleBtn.classList.toggle('hidden', !canToggle);
+			toggleBtn.classList.toggle('is-active', show);
+			toggleBtn.setAttribute('aria-pressed', show ? 'true' : 'false');
+		}
+	}
+
+	function buildTocFromHtml() {
+		var out = document.getElementById('output');
+		var nav = document.getElementById('preview-toc');
+		if (!out || !nav) return;
+		var heading = nav.querySelector('.toc-heading');
+		nav.innerHTML = '';
+		if (heading) nav.appendChild(heading);
+		var heads = out.querySelectorAll('h1,h2,h3,h4');
+		if (!heads.length) {
+			syncTocVisibility();
+			return;
+		}
+		var ul = document.createElement('ul');
+		ul.className = 'toc-list';
+		heads.forEach(function (h, i) {
+			if (!h.id) h.id = 'rtlmd-h-' + i;
+			var li = document.createElement('li');
+			li.className = 'toc-l' + h.tagName.slice(1);
+			var a = document.createElement('a');
+			a.href = '#' + h.id;
+			a.textContent = h.textContent;
+			a.addEventListener('click', function (e) {
+				e.preventDefault();
+				h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			});
+			li.appendChild(a);
+			ul.appendChild(li);
+		});
+		nav.appendChild(ul);
+		syncTocVisibility();
+	}
+
+	window.rtlmdOnFullviewChange = function () {
+		syncTocVisibility();
+	};
+
+	function closeToc() {
+		storageSet(TOC_KEY, '0');
+		syncTocVisibility();
+	}
+
+	function toggleToc() {
+		storageSet(TOC_KEY, tocEnabledInSettings() ? '0' : '1');
+		syncTocVisibility();
+	}
+
+	function renderFrontMatterBanner() {
+		var host = document.getElementById('front-matter-banner');
+		if (!host) return;
+		var fm = window.__rtlmdFrontMatter;
+		if (!fm || !Object.keys(fm).length) {
+			host.classList.add('hidden');
+			host.innerHTML = '';
+			return;
+		}
+		host.classList.remove('hidden');
+		var rows = Object.keys(fm).map(function (k) {
+			return '<tr><th>' + k + '</th><td>' + String(fm[k]).replace(/</g, '&lt;') + '</td></tr>';
+		}).join('');
+		host.innerHTML = '<div class="fm-title">' + t('frontMatter') + '</div><table><tbody>' + rows + '</tbody></table>';
+	}
+
+/* ===== src: app/js/src/extras/40-find-images.js ===== */
+/* ── 40-find-images.js ──
+   Doc-list search filter, image paste/drop, find & replace panel. */
+	function filterDocList(query) {
+		var q = String(query || '').trim().toLowerCase();
+		document.querySelectorAll('#doc-list .doc-item').forEach(function (li) {
+			var id = li.getAttribute('data-id');
+			var doc = api && id ? api.findDoc(id) : null;
+			var title = (li.querySelector('.doc-title') || {}).textContent || '';
+			var show = !q || title.toLowerCase().indexOf(q) !== -1 ||
+				(doc && (doc.content || '').toLowerCase().indexOf(q) !== -1);
+			li.classList.toggle('hidden-by-search', !show);
+		});
+	}
+
+	function insertImageMarkdown(dataUrl, alt) {
+		if (!api) return;
+		var ed = api.getEditor();
+		if (!ed || !ed.length) return;
+		var el = ed[0];
+		var md = '\n\n![' + (alt || 'image') + '](' + dataUrl + ')\n\n';
+		var start = el.selectionStart;
+		var val = el.value;
+		el.value = val.slice(0, start) + md + val.slice(el.selectionEnd);
+		el.focus();
+		el.selectionStart = el.selectionEnd = start + md.length;
+		api.onEditorChange();
+	}
+
+	function readFileAsDataUrl(file) {
+		return new Promise(function (resolve, reject) {
+			var reader = new FileReader();
+			reader.onload = function () { resolve(reader.result); };
+			reader.onerror = reject;
+			reader.readAsDataURL(file);
+		});
+	}
+
+	function bindImagePasteDrop() {
+		var box = document.getElementById('textbox');
+		if (!box) return;
+		box.addEventListener('paste', function (e) {
+			var items = e.clipboardData && e.clipboardData.items;
+			if (!items) return;
+			for (var i = 0; i < items.length; i++) {
+				if (items[i].type.indexOf('image') === 0) {
+					var file = items[i].getAsFile();
+					if (!file) continue;
+					e.preventDefault();
+					readFileAsDataUrl(file).then(function (url) {
+						insertImageMarkdown(url, 'pasted-image');
+					});
+					return;
+				}
+			}
+		});
+		box.addEventListener('dragover', function (e) {
+			if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') !== -1) {
+				e.preventDefault();
+			}
+		});
+		box.addEventListener('drop', function (e) {
+			var files = e.dataTransfer && e.dataTransfer.files;
+			if (!files || !files.length) return;
+			var file = files[0];
+			if (!file.type || file.type.indexOf('image') !== 0) return;
+			e.preventDefault();
+			readFileAsDataUrl(file).then(function (url) {
+				insertImageMarkdown(url, file.name || 'image');
+			});
+		});
+	}
+
+	var findState = { idx: 0 };
+
+	function getFindMatches(text, needle, caseSensitive) {
+		if (!needle) return [];
+		var src = String(text || '');
+		var hay = caseSensitive ? src : src.toLowerCase();
+		var n = caseSensitive ? needle : needle.toLowerCase();
+		var out = [];
+		var pos = 0;
+		while (pos <= hay.length) {
+			var at = hay.indexOf(n, pos);
+			if (at === -1) break;
+			out.push({ start: at, end: at + needle.length });
+			pos = at + (needle.length || 1);
+		}
+		return out;
+	}
+
+	function applyFindHighlight() {
+		/* selection-based find — no overlay */
+	}
+
+	function runFind(direction) {
+		if (!api) return;
+		var ed = api.getEditor();
+		if (!ed || !ed.length) return;
+		var el = ed[0];
+		var needle = (document.getElementById('find-input') || {}).value || '';
+		if (!needle) return;
+		var caseBox = document.getElementById('find-case');
+		var matches = getFindMatches(el.value, needle, caseBox && caseBox.checked);
+		if (!matches.length) return;
+		if (direction === 'next') findState.idx = (findState.idx + 1) % matches.length;
+		else findState.idx = (findState.idx - 1 + matches.length) % matches.length;
+		var m = matches[findState.idx];
+		el.focus();
+		el.setSelectionRange(m.start, m.end);
+		var lineH = parseFloat(getComputedStyle(el).lineHeight) || 20;
+		el.scrollTop = Math.max(0, (el.value.slice(0, m.start).split('\n').length - 3) * lineH);
+	}
+
+	function runReplace(all) {
+		if (!api) return;
+		var ed = api.getEditor();
+		if (!ed || !ed.length) return;
+		var el = ed[0];
+		var needle = (document.getElementById('find-input') || {}).value || '';
+		var repl = (document.getElementById('replace-input') || {}).value || '';
+		if (!needle) return;
+		var caseBox = document.getElementById('find-case');
+		var val = el.value;
+		if (all) {
+			var re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), caseBox && caseBox.checked ? 'g' : 'gi');
+			el.value = val.replace(re, repl);
+		} else {
+			var start = el.selectionStart;
+			var end = el.selectionEnd;
+			var slice = val.slice(start, end);
+			var matches = caseBox && caseBox.checked ? slice === needle : slice.toLowerCase() === needle.toLowerCase();
+			if (matches) {
+				el.value = val.slice(0, start) + repl + val.slice(end);
+				el.setSelectionRange(start, start + repl.length);
+			} else {
+				runFind('next');
+				return;
+			}
+		}
+		api.onEditorChange();
+	}
+
+	function toggleFindPanel(show) {
+		var panel = document.getElementById('find-panel');
+		if (!panel) return;
+		panel.classList.toggle('hidden', show === false);
+		if (show !== false) {
+			panel.classList.remove('hidden');
+			var input = document.getElementById('find-input');
+			if (input) input.focus();
+		}
+	}
+
+/* ===== src: app/js/src/extras/50-snapshots.js ===== */
+/* ── 50-snapshots.js ──
+   Document version snapshots + duplicate-doc hook. */
+	function pushSnapshot(doc, label) {
+		if (!doc || doc.pinned) return;
+		doc.snapshots = doc.snapshots || [];
+		var content = doc.content;
+		if (api.getEditor && api.getEditor().length && doc.id === api.docsState.activeId) {
+			content = api.getEditor().val();
+		}
+		doc.snapshots.unshift({
+			at: Date.now(),
+			label: label || '',
+			content: content
+		});
+		if (doc.snapshots.length > MAX_SNAPSHOTS) doc.snapshots.length = MAX_SNAPSHOTS;
+		api.writeDocs(api.docsState.items);
+	}
+
+	function restoreSnapshot(doc, snap) {
+		if (!doc || !snap) return;
+		if (!api.confirmLeaveIfDiskDirty()) return;
+		doc.content = snap.content;
+		doc.updatedAt = Date.now();
+		api.writeDocs(api.docsState.items);
+		if (doc.id === api.docsState.activeId) {
+			api.loadDocIntoEditor(doc);
+		} else {
+			api.renderDocList();
+		}
+	}
+
+	function openSnapshotDialog() {
+		if (!api) return;
+		var doc = api.findDoc(api.docsState.activeId);
+		if (!doc) return;
+		var snaps = doc.snapshots || [];
+		if (!snaps.length) {
+			window.alert(t('noSnapshots'));
+			return;
+		}
+		var lines = snaps.map(function (s, i) {
+			return (i + 1) + '. ' + new Date(s.at).toLocaleString() + (s.label ? ' — ' + s.label : '');
+		}).join('\n');
+		var pick = window.prompt(t('restoreSnapshot') + '\n\n' + lines, '1');
+		if (pick === null) return;
+		var idx = parseInt(pick, 10) - 1;
+		if (isNaN(idx) || idx < 0 || idx >= snaps.length) return;
+		restoreSnapshot(doc, snaps[idx]);
+	}
+
+	window.rtlmdDuplicateDoc = function (id) {
+		if (!api) return;
+		var src = api.findDoc(id);
+		if (!src) return;
+		api.createDoc(src.content, (src.title || api.UNTITLED) + ' (copy)', { titleLocked: true });
+	};
+
+/* ===== src: app/js/src/extras/60-export-word.js ===== */
+/* ── 60-export-word.js ──
+   Real .docx export (lazy OOXML bundle) with styled .doc fallback. */
+	var WORD_BUNDLE_SRC = 'assets/vendor/docx/word-docx.bundle.js';
+	var WORD_DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+	var wordBundlePromise = null;
+
+	/* Real .docx export is lazy-loaded so the ~400 KB OOXML engine never slows
+	   down startup; the bundle is same-origin + SW-precached, so offline works. */
+	function ensureWordBundle() {
+		if (window.RtlmWordDocx && typeof window.RtlmWordDocx.buildDocxBlob === 'function') {
+			return Promise.resolve();
+		}
+		if (wordBundlePromise) return wordBundlePromise;
+		wordBundlePromise = new Promise(function (resolve, reject) {
+			var s = document.createElement('script');
+			s.src = WORD_BUNDLE_SRC;
+			s.onload = function () {
+				if (window.RtlmWordDocx && typeof window.RtlmWordDocx.buildDocxBlob === 'function') resolve();
+				else reject(new Error('word bundle has no api'));
+			};
+			s.onerror = function () { reject(new Error('word bundle failed to load')); };
+			document.head.appendChild(s);
+		});
+		return wordBundlePromise;
+	}
+
+	function downloadBlob(blob, filename, type) {
+		var out = blob instanceof Blob ? blob : new Blob([blob], { type: type });
+		var url = URL.createObjectURL(out);
+		var a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+	}
+
+	function legacyWordDoc(doc) {
+		var styledHtml = null;
+		if (api && typeof api.buildWordDocument === 'function') {
+			try { styledHtml = api.buildWordDocument(doc.title); } catch (e) { styledHtml = null; }
+		}
+		if (!styledHtml) {
+			var raw = document.getElementById('output').innerHTML;
+			styledHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body dir="' +
+				api.getContentDir() + '">' + raw + '</body></html>';
+		}
+		api.downloadFile('﻿' + styledHtml, api.slugifyFilename(doc.title) + '.doc', 'application/msword');
+	}
+
+	window.rtlmdExportDocx = function () {
+		if (!api) return;
+		var doc = api.findDoc(api.docsState.activeId);
+		if (!doc) return;
+		var btn = document.querySelector('[data-export="docx"]');
+		if (btn) btn.disabled = true;
+		function done() { if (btn) btn.disabled = false; }
+		ensureWordBundle().then(function () {
+			return window.RtlmWordDocx.buildDocxBlob({
+				title: doc.title,
+				dir: api.getContentDir(),
+				html: document.getElementById('output').innerHTML
+			});
+		}).then(function (blob) {
+			downloadBlob(blob, api.slugifyFilename(doc.title) + '.docx', WORD_DOCX_MIME);
+			done();
+		}).catch(function () {
+			/* offline-safe fallback: styled Word-HTML (.doc) */
+			try {
+				legacyWordDoc(doc);
+			} catch (e) {
+				window.alert(t('wordExportFailed'));
+			}
+			done();
+		});
+	};
+
+/* ===== src: app/js/src/extras/70-backup-folder.js ===== */
+/* ── 70-backup-folder.js ──
+   JSON backup export/import, open-folder-from-disk. */
+	function exportBackup() {
+		if (!api) return;
+		var payload = {
+			version: 1,
+			exportedAt: Date.now(),
+			docs: api.docsState.items
+		};
+		api.downloadFile(JSON.stringify(payload, null, 2), 'markdown-tools-backup.json', 'application/json');
+	}
+
+	function importBackup(file) {
+		if (!api || !file) return;
+		file.text().then(function (text) {
+			var data = JSON.parse(text);
+			if (!data || !Array.isArray(data.docs)) throw new Error('invalid');
+			if (!window.confirm('Replace all local documents with backup?')) return;
+			api.writeDocs(data.docs.map(function (d) {
+				return {
+					id: d.id || api.uid(),
+					title: d.title || api.UNTITLED,
+					content: d.content || '',
+					pinned: !!d.pinned,
+					sourcePath: d.sourcePath || null,
+					titleLocked: !!d.titleLocked,
+					lastSavedToDisk: typeof d.lastSavedToDisk === 'string' ? d.lastSavedToDisk : null,
+					snapshots: Array.isArray(d.snapshots) ? d.snapshots : [],
+					updatedAt: d.updatedAt || Date.now(),
+					createdAt: d.createdAt || Date.now()
+				};
+			}));
+			var first = api.docsState.items[0];
+			if (first) api.loadDocIntoEditor(first);
+			api.renderDocList();
+		}).catch(function () {
+			window.alert('Invalid backup file.');
+		});
+	}
+
+	async function openFolderFromDisk() {
+		if (!api) return;
+		if (typeof window.showDirectoryPicker !== 'function') {
+			window.alert('Folder open needs Chrome/Edge File System Access API.');
+			return;
+		}
+		try {
+			var dir = await window.showDirectoryPicker({ mode: 'read' });
+			var entries = [];
+			for await (var entry of dir.values()) {
+				if (entry.kind === 'file' && /\.(md|markdown|mdown|mkd|mkdn)$/i.test(entry.name)) {
+					entries.push(entry);
+				}
+			}
+			for (var i = 0; i < entries.length; i++) {
+				var file = await entries[i].getFile();
+				var content = await file.text();
+				api.openExternalMarkdownFile({
+					path: entries[i].name,
+					name: entries[i].name.replace(/\.(md|markdown|mdown|mkd|mkdn)$/i, ''),
+					content: content,
+					handle: null
+				});
+			}
+		} catch (err) {
+			if (err && err.name === 'AbortError') return;
+			window.alert('Could not open folder.');
+		}
+	}
+
+/* ===== src: app/js/src/extras/80-settings.js ===== */
+/* ── 80-settings.js ──
+   Line numbers, disk autosave, spellcheck pref, settings dialog. */
+	function syncLineNumbers() {
+		var ta = document.querySelector('#textbox textarea');
+		var gutter = document.getElementById('line-numbers');
+		if (!ta || !gutter) return;
+		if (storageGet(LINE_NUM_KEY, '0') !== '1') {
+			gutter.classList.add('hidden');
+			return;
+		}
+		gutter.classList.remove('hidden');
+		var lines = String(ta.value || '').split('\n').length;
+		var nums = [];
+		for (var i = 1; i <= lines; i++) nums.push(i);
+		gutter.textContent = nums.join('\n');
+		gutter.scrollTop = ta.scrollTop;
+	}
+
+	function bindLineNumbers() {
+		var ta = document.querySelector('#textbox textarea');
+		if (!ta) return;
+		ta.addEventListener('scroll', syncLineNumbers);
+		ta.addEventListener('input', syncLineNumbers);
+	}
+
+	var autosaveTimer = null;
+	function setupAutosave() {
+		clearInterval(autosaveTimer);
+		if (storageGet(AUTOSAVE_KEY, '0') !== '1') return;
+		autosaveTimer = setInterval(function () {
+			if (!api || !api.isActiveDocDiskDirty()) return;
+			var doc = api.findDoc(api.docsState.activeId);
+			if (!doc || !api.canWriteDocToDisk(doc)) return;
+			api.persistActiveFromEditor({ silentList: true });
+			api.saveActiveDocToDisk();
+		}, 45000);
+	}
+
+	function applySpellcheckPref() {
+		var ta = document.querySelector('#textbox textarea');
+		if (!ta) return;
+		ta.spellcheck = storageGet(SPELL_KEY, '0') === '1';
+	}
+
+	function openSettings() {
+		var dlg = document.getElementById('settings-dialog');
+		if (!dlg) return;
+		dlg.querySelector('#set-lang').value = lang();
+		dlg.querySelector('#set-spell').checked = storageGet(SPELL_KEY, '0') === '1';
+		dlg.querySelector('#set-autosave').checked = storageGet(AUTOSAVE_KEY, '0') === '1';
+		dlg.querySelector('#set-linenum').checked = storageGet(LINE_NUM_KEY, '0') === '1';
+		dlg.querySelector('#set-toc').checked = storageGet(TOC_KEY, '1') !== '0';
+		dlg.showModal();
+	}
+
+	function saveSettingsFromDialog() {
+		var dlg = document.getElementById('settings-dialog');
+		if (!dlg) return;
+		storageSet(LANG_KEY, dlg.querySelector('#set-lang').value);
+		storageSet(SPELL_KEY, dlg.querySelector('#set-spell').checked ? '1' : '0');
+		storageSet(AUTOSAVE_KEY, dlg.querySelector('#set-autosave').checked ? '1' : '0');
+		storageSet(LINE_NUM_KEY, dlg.querySelector('#set-linenum').checked ? '1' : '0');
+		storageSet(TOC_KEY, dlg.querySelector('#set-toc').checked ? '1' : '0');
+		applyI18n();
+		applySpellcheckPref();
+		setupAutosave();
+		syncLineNumbers();
+		syncTocVisibility();
+		dlg.close();
+	}
+
+/* ===== src: app/js/src/extras/90-init.js ===== */
+/* ── 90-init.js ──
+   Preview-post hook composition, global UI bindings, initRtlmdExtras(). */
+	function hookRenderPreview() {
+		window.rtlmdAfterPreview = function () {
+			renderFrontMatterBanner();
+			// Always (re)build the TOC list, even when the setting is off —
+			// otherwise the toggle button/panel has nothing to show once re-enabled.
+			buildTocFromHtml();
+			updateWordCount();
+			syncLineNumbers();
+		};
+	}
+
+	function bindUi() {
+		document.getElementById('btn-settings').addEventListener('click', openSettings);
+		var tocCloseBtn = document.getElementById('toc-close');
+		if (tocCloseBtn) tocCloseBtn.addEventListener('click', closeToc);
+		var tocToggleBtn = document.getElementById('toc-toggle');
+		if (tocToggleBtn) tocToggleBtn.addEventListener('click', toggleToc);
+		document.getElementById('settings-form').addEventListener('submit', function (e) {
+			e.preventDefault();
+			saveSettingsFromDialog();
+		});
+		document.getElementById('btn-find-toggle').addEventListener('click', function () {
+			var panel = document.getElementById('find-panel');
+			toggleFindPanel(panel && panel.classList.contains('hidden'));
+		});
+		document.getElementById('find-next').addEventListener('click', function () { runFind('next'); });
+		document.getElementById('find-prev').addEventListener('click', function () { runFind('prev'); });
+		document.getElementById('find-replace-one').addEventListener('click', function () { runReplace(false); });
+		document.getElementById('find-replace-all').addEventListener('click', function () { runReplace(true); });
+		document.getElementById('find-close').addEventListener('click', function () { toggleFindPanel(false); });
+
+		document.getElementById('doc-search').addEventListener('input', function () {
+			filterDocList(this.value);
+		});
+
+		document.getElementById('doc-open-folder').addEventListener('click', openFolderFromDisk);
+		document.getElementById('doc-backup-export').addEventListener('click', exportBackup);
+		document.getElementById('doc-backup-import').addEventListener('change', function (e) {
+			var f = e.target.files && e.target.files[0];
+			if (f) importBackup(f);
+			e.target.value = '';
+		});
+
+		document.getElementById('doc-template').addEventListener('change', function () {
+			var key = this.value;
+			if (!key || !api) return;
+			api.createDoc(TEMPLATES[key] || TEMPLATES.blank, null, {});
+			this.value = '';
+		});
+
+		document.getElementById('btn-snapshot').addEventListener('click', function () {
+			var doc = api.findDoc(api.docsState.activeId);
+			if (!doc) return;
+			api.persistActiveFromEditor({ silentList: true });
+			pushSnapshot(doc, 'manual');
+			window.alert(t('snapshotSaved'));
+		});
+		document.getElementById('btn-restore-snapshot').addEventListener('click', openSnapshotDialog);
+
+		document.addEventListener('keydown', function (e) {
+			if ((e.ctrlKey || e.metaKey) && e.code === 'KeyF') {
+				e.preventDefault();
+				toggleFindPanel(true);
+			}
+			if ((e.ctrlKey || e.metaKey) && e.code === 'KeyH') {
+				e.preventDefault();
+				toggleFindPanel(true);
+				var rep = document.getElementById('replace-input');
+				if (rep) rep.focus();
+			}
+		});
+
+		var ta = document.querySelector('#textbox textarea');
+		if (ta) {
+			ta.addEventListener('keydown', function (e) {
+				if (e.key !== 'Tab' || e.ctrlKey || e.metaKey || e.altKey) return;
+				e.preventDefault();
+				var start = ta.selectionStart;
+				var end = ta.selectionEnd;
+				var val = ta.value;
+				var insert = '  ';
+				ta.value = val.slice(0, start) + insert + val.slice(end);
+				ta.selectionStart = ta.selectionEnd = start + insert.length;
+				if (api) api.onEditorChange();
+			});
+		}
+	}
+
+	window.rtlmdOnDiskSaved = function (doc) {
+		if (!doc || doc.pinned) return;
+		var snaps = doc.snapshots || [];
+		if (snaps[0] && snaps[0].content === doc.content) return;
+		pushSnapshot(doc, 'disk-save');
+	};
+
+	window.initRtlmdExtras = function (rtlmdApi) {
+		api = rtlmdApi;
+		hookRenderPreview();
+		applyI18n();
+		applySpellcheckPref();
+		setupAutosave();
+		bindUi();
+		bindImagePasteDrop();
+		bindLineNumbers();
+		syncLineNumbers();
+		updateWordCount();
+		syncTocVisibility();
+		if (api.renderPreview) api.renderPreview();
+	};
+
 }());

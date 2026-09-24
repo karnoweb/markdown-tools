@@ -9,6 +9,22 @@ const APP_USER_MODEL_ID = 'ir.karnoweb.markdown-tools';
 let mainWindow = null;
 const fileOpenQueue = [];
 
+/* Security: the renderer only ever needs write access to a file it (or the user, via a
+   native Open dialog / file-association / double-click) already read through this main
+   process. `rtlmd:save-file` must refuse any path that was never opened this way — this
+   is a defense-in-depth boundary so that even if the renderer were ever compromised (e.g.
+   by a future XSS bug in the Markdown preview), it cannot use the exposed saveFile() API
+   to write arbitrary files elsewhere on disk. */
+const allowedWritePaths = new Set();
+
+function markPathWritable(absPath) {
+	allowedWritePaths.add(absPath.toLowerCase());
+}
+
+function isPathWritable(absPath) {
+	return allowedWritePaths.has(absPath.toLowerCase());
+}
+
 if (process.platform === 'win32') {
 	app.setAppUserModelId(APP_USER_MODEL_ID);
 }
@@ -66,6 +82,10 @@ function readMarkdownFile(filePath) {
 	const abs = path.resolve(filePath);
 	const content = fs.readFileSync(abs, 'utf8');
 	const base = path.basename(abs, path.extname(abs));
+	/* This is the single choke point every open flow (dialog, file association,
+	   double-click, second-instance) goes through — so marking it writable here covers
+	   every legitimate case where the renderer later asks to save this same path. */
+	markPathWritable(abs);
 	return { path: abs, content: content, name: base };
 }
 
@@ -158,10 +178,16 @@ ipcMain.handle('rtlmd:open-file-dialog', async function () {
 });
 
 ipcMain.handle('rtlmd:save-file', function (_event, payload) {
-	if (!payload || !payload.path) {
+	if (!payload || typeof payload.path !== 'string' || !payload.path) {
 		throw new Error('No file path');
 	}
 	const abs = path.resolve(payload.path);
+	if (!isMarkdownPath(abs)) {
+		throw new Error('Only Markdown files (.md, .markdown, .mdown, .mkd, .mkdn) can be saved.');
+	}
+	if (!isPathWritable(abs)) {
+		throw new Error('This file was not opened through Markdown Tools; refusing to write to it.');
+	}
 	const content = typeof payload.content === 'string' ? payload.content : '';
 	fs.writeFileSync(abs, content, 'utf8');
 	return { path: abs, savedAt: Date.now() };

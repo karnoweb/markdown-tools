@@ -1,0 +1,121 @@
+/* ── 07-components.css ──
+   Sidebar tools, doc search, find panel, stats, TOC list, front-matter banner. */
+.sidebar-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid oklch(var(--b3));
+}
+
+.doc-item.hidden-by-search {
+  display: none;
+}
+
+.find-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.65rem;
+  border-bottom: 1px solid oklch(var(--b3));
+  background: oklch(var(--b3) / 0.2);
+  direction: ltr;
+}
+
+.find-panel.hidden {
+  display: none;
+}
+
+.find-panel .input {
+  min-width: 6rem;
+  flex: 1 1 6rem;
+}
+
+.find-case-label {
+  font-size: 0.72rem;
+  opacity: 0.8;
+}
+
+.editor-stats {
+  font-size: 0.65rem;
+  font-weight: 500;
+  opacity: 0.65;
+  white-space: nowrap;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-toc {
+  display: none;
+  font-size: 0.82rem;
+}
+
+.preview-toc.hidden {
+  display: none !important;
+}
+
+.preview-toc .toc-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  opacity: 0.75;
+}
+
+.toc-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.toc-close:hover,
+.toc-close:focus-visible {
+  opacity: 1;
+  background: oklch(var(--b3) / 0.6);
+}
+
+.toc-list {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+.toc-l2 { margin-inline-start: 0.5rem; }
+.toc-l3 { margin-inline-start: 1rem; }
+.toc-l4 { margin-inline-start: 1.5rem; }
+
+.front-matter-banner {
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid oklch(var(--b3));
+  font-size: 0.78rem;
+}
+
+.front-matter-banner.hidden {
+  display: none;
+}
+
+.front-matter-banner table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.front-matter-banner th {
+  text-align: start;
+  padding-inline-end: 0.75rem;
+  opacity: 0.7;
+}

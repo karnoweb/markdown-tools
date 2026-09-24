@@ -1,14 +1,23 @@
 'use strict';
 
-var CACHE_NAME = 'rtlmd-v6';
+var CACHE_NAME = 'rtlmd-v16';
 var PRECACHE = [
 	'./',
 	'./index.html',
 	'./initcontent.md',
 	'./manifest.webmanifest',
-	'./app/css/style.css',
-	'./app/js/rtlmd.js',
-	'./app/js/rtlmd-extras.js',
+	'./app/css/00-tokens-base.css',
+	'./app/css/01-appbar.css',
+	'./app/css/02-sidebar.css',
+	'./app/css/03-editor.css',
+	'./app/css/04-fullview.css',
+	'./app/css/05-preview.css',
+	'./app/css/06-responsive.css',
+	'./app/css/07-components.css',
+	'./app/css/08-settings.css',
+	'./app/js/rtlmd.bundle.js',
+	'./assets/vendor/docx/word-docx.bundle.js',
+	'./assets/vendor/dompurify/purify.min.js',
 	'./assets/vendor/katex/katex.min.js',
 	'./assets/vendor/katex/katex.min.css',
 	'./assets/brand/karnoweb-logo.png',

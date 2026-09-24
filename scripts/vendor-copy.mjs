@@ -133,6 +133,10 @@ async function main() {
 		path.join(nm, 'katex', 'dist', 'katex.min.css'),
 		path.join(vendor, 'katex', 'katex.min.css')
 	);
+	copyFile(
+		path.join(nm, 'dompurify', 'dist', 'purify.min.js'),
+		path.join(vendor, 'dompurify', 'purify.min.js')
+	);
 
 	const prismRoot = path.join(nm, 'prismjs');
 	copyFile(path.join(prismRoot, 'prism.js'), path.join(vendor, 'prism', 'prism.min.js'));

@@ -1,0 +1,293 @@
+/* ── 03-editor.css ──
+   Editor/preview panes, headers, toolbar, textarea, line numbers, locked state, scroll mirror, #output base. */
+.workspace {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+#textbox,
+#output,
+.editor-pane {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  background-color: oklch(var(--b2));
+  border: 1px solid oklch(var(--b3));
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+#textbox.editor-pane {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+
+#textbox .find-panel,
+#textbox .pane-header,
+#textbox .md-toolbar {
+  flex-shrink: 0;
+}
+
+.editor-pane--preview .pane-header,
+.editor-pane--preview .front-matter-banner {
+  flex-shrink: 0;
+}
+
+.editor-pane--preview .preview-body {
+  flex: 1 1 0%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pane-header {
+  box-sizing: border-box;
+  height: 2.75rem;
+  min-height: 2.75rem;
+  max-height: 2.75rem;
+  padding: 0 1em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background-color: oklch(var(--b3) / 0.35);
+  border-bottom: 1px solid oklch(var(--b3));
+  color: oklch(var(--bc) / 0.65);
+  flex-shrink: 0;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow: hidden;
+}
+
+.pane-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pane-doc-title {
+  font-weight: 500;
+  opacity: 0.7;
+  max-width: 55%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.doc-save-btn {
+  flex-shrink: 0;
+}
+
+.doc-save-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pane-doc-title.is-dirty {
+  opacity: 0.95;
+}
+
+.pane-doc-title.is-saved-flash {
+  opacity: 1;
+  color: oklch(var(--su));
+}
+
+.pane-header--preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 0.2rem;
+  direction: ltr;
+}
+
+.export-actions .btn {
+  min-height: 1.6rem;
+  height: 1.6rem;
+  padding-inline: 0.45rem;
+  font-family: var(--rtlmd-mono);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.md-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.65rem;
+  border-bottom: 1px solid oklch(var(--b3));
+  background: oklch(var(--b2));
+  flex-shrink: 0;
+  direction: ltr;
+}
+
+.md-tool {
+  min-height: 1.6rem;
+  height: 1.6rem;
+  padding: 0 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: oklch(var(--bc) / 0.75);
+  font-family: var(--rtlmd-mono);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.md-tool:hover,
+.md-tool:focus-visible {
+  background: oklch(var(--b3));
+  color: oklch(var(--bc));
+  outline: none;
+}
+
+.md-tool em {
+  font-style: italic;
+}
+
+.editor-pane--preview .pane-header {
+  background-color: oklch(var(--b3) / 0.35);
+  color: oklch(var(--bc) / 0.65);
+  border-bottom-color: oklch(var(--b3));
+}
+
+.editor-body {
+  display: flex;
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.line-numbers {
+  flex: 0 0 auto;
+  min-width: 2.75rem;
+  padding: 1.15em 0.5em 1.15em 0.85em;
+  overflow: hidden;
+  font-family: var(--rtlmd-mono);
+  font-size: 0.72rem;
+  line-height: var(--rtlmd-line-height);
+  text-align: end;
+  color: oklch(var(--bc) / 0.45);
+  background: oklch(var(--b3) / 0.25);
+  border-inline-end: 1px solid oklch(var(--b3));
+  user-select: none;
+  white-space: pre;
+}
+
+.line-numbers.hidden {
+  display: none;
+}
+
+#textbox textarea {
+  flex: 1 1 0%;
+  min-width: 0;
+  min-height: 0;
+  width: auto;
+  height: auto;
+  align-self: stretch;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.15em 1.35em;
+  background-color: oklch(var(--b1));
+  border: none;
+  border-radius: 0;
+  resize: none;
+  font-family: var(--rtlmd-font);
+  font-size: var(--rtlmd-text-size);
+  line-height: var(--rtlmd-line-height);
+  color: oklch(var(--bc));
+  unicode-bidi: plaintext;
+  text-align: start;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  tab-size: 2;
+}
+
+#textbox textarea:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px oklch(var(--p) / 0.35);
+}
+
+#textbox.is-locked textarea {
+  cursor: default;
+  opacity: 0.92;
+  background-image: linear-gradient(
+    135deg,
+    oklch(var(--p) / 0.04) 25%,
+    transparent 25%,
+    transparent 50%,
+    oklch(var(--p) / 0.04) 50%,
+    oklch(var(--p) / 0.04) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 18px 18px;
+}
+
+#textbox.is-locked .md-toolbar {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+#textbox.is-locked .pane-header > span::after {
+  content: ' · locked';
+  font-weight: 500;
+  opacity: 0.65;
+  font-size: 0.78em;
+}
+
+/* Off-screen mirror for wrapped-line Y map (scroll sync) */
+#scroll-sync-mirror {
+  position: absolute;
+  left: -99999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+  height: auto;
+  overflow: hidden;
+}
+
+#output {
+  flex: 1 1 0;
+  width: 100%;
+  max-width: none;
+  height: 0;
+  min-height: 0;
+  align-self: stretch;
+  overflow: auto;
+  padding: 1.15em 1.35em;
+  background-color: oklch(var(--b1));
+  box-sizing: border-box;
+}
+
+#output.markdown-body {
+  max-width: none;
+  width: 100%;
+  margin-inline: 0;
+}
