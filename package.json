@@ -91,9 +91,11 @@
         "AppImage",
         "deb"
       ],
-      "category": "Office"
+      "category": "Office",
+      "maintainer": "karnoweb <karnoweb@users.noreply.github.com>"
     },
     "mac": {
+      "icon": "icon.png",
       "target": [
         "dmg"
       ],
