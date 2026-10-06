@@ -23,8 +23,8 @@
 			applyTheme(this.value);
 		});
 
-		$('#font-size-toggle').on('change', function () {
-			applyFontSize(this.checked ? 'large' : 'normal');
+		$('#font-size-select').on('change', function () {
+			applyFontSize(this.value);
 		});
 
 		$('#fullview-toggle').on('change', function () {
@@ -109,6 +109,7 @@
 				handle.removeEventListener('pointerup', up);
 				handle.removeEventListener('pointercancel', up);
 				document.body.classList.remove('is-resizing-panes');
+				if (scrollSyncOn) refreshScrollMaps();
 				if (pct !== null) storageSet(KEY, String(Math.round(pct * 10) / 10));
 			}
 			handle.addEventListener('pointermove', move);

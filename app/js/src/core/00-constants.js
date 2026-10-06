@@ -9,6 +9,7 @@
 	var THEME_KEY = 'rtlmd-theme';
 	var DIR_KEY = 'rtlmd-dir';
 	var FONT_KEY = 'rtlmd-font-size';
+	var FONT_SIZES = ['xs', 'sm', 'md', 'lg', 'xl'];
 	var FULLVIEW_KEY = 'rtlmd-fullview';
 	var SCROLL_SYNC_KEY = 'rtlmd-scroll-sync';
 	var PREFS_VER_KEY = 'rtlmd-prefs-ver';
@@ -35,7 +36,12 @@
 		dark: 1, night: 1, dracula: 1, dim: 1, nord: 1, sunset: 1,
 		forest: 1, luxury: 1, coffee: 1, business: 1, halloween: 1,
 		synthwave: 1, black: 1, cyberpunk: 1,
-		'karnoweb-dark': 1
+		'karnoweb-dark': 1,
+		/* reading themes (generated in 00-tokens-base.css by scripts/gen-themes.mjs) */
+		'github-dark': 1, 'github-dimmed': 1, 'one-dark': 1, 'tokyo-night': 1,
+		'nord-polar': 1, 'dracula-night': 1, 'solarized-dark': 1, 'gruvbox-dark': 1,
+		'rose-pine-moon': 1, 'catppuccin-mocha': 1, graphite: 1, 'oled-black': 1,
+		'contrast-dark': 1
 	};
 
 	var VENDOR = 'assets/vendor/';

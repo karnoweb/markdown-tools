@@ -17,6 +17,7 @@
 	var THEME_KEY = 'rtlmd-theme';
 	var DIR_KEY = 'rtlmd-dir';
 	var FONT_KEY = 'rtlmd-font-size';
+	var FONT_SIZES = ['xs', 'sm', 'md', 'lg', 'xl'];
 	var FULLVIEW_KEY = 'rtlmd-fullview';
 	var SCROLL_SYNC_KEY = 'rtlmd-scroll-sync';
 	var PREFS_VER_KEY = 'rtlmd-prefs-ver';
@@ -43,7 +44,12 @@
 		dark: 1, night: 1, dracula: 1, dim: 1, nord: 1, sunset: 1,
 		forest: 1, luxury: 1, coffee: 1, business: 1, halloween: 1,
 		synthwave: 1, black: 1, cyberpunk: 1,
-		'karnoweb-dark': 1
+		'karnoweb-dark': 1,
+		/* reading themes (generated in 00-tokens-base.css by scripts/gen-themes.mjs) */
+		'github-dark': 1, 'github-dimmed': 1, 'one-dark': 1, 'tokyo-night': 1,
+		'nord-polar': 1, 'dracula-night': 1, 'solarized-dark': 1, 'gruvbox-dark': 1,
+		'rose-pine-moon': 1, 'catppuccin-mocha': 1, graphite: 1, 'oled-black': 1,
+		'contrast-dark': 1
 	};
 
 	var VENDOR = 'assets/vendor/';
@@ -578,17 +584,25 @@
 	}
 
 	function applyFontSize(size) {
-		var large = size === 'large';
-		document.documentElement.classList.toggle('font-large', large);
-		$('#font-size-toggle').prop('checked', large);
-		$('#font-size-toggle').closest('label')
-			.toggleClass('btn-active', large)
-			.attr('title', large ? 'Zoom out text' : 'Zoom in text');
+		size = normalizeFontSize(size);
+		document.documentElement.setAttribute('data-font-size', size);
+		$('#font-size-select').val(size);
 		storageSet(FONT_KEY, size);
+		/* line positions change with the text size */
+		if (scrollSyncOn) {
+			requestAnimationFrame(refreshScrollMaps);
+		}
+	}
+
+	/* 5 steps; legacy values 'normal'/'large' (old toggle) map to md/lg. */
+	function normalizeFontSize(size) {
+		if (size === 'normal') return 'md';
+		if (size === 'large') return 'lg';
+		return FONT_SIZES.indexOf(size) !== -1 ? size : 'md';
 	}
 
 	function initFontSize() {
-		applyFontSize(storageGet(FONT_KEY, 'normal'));
+		applyFontSize(storageGet(FONT_KEY, 'md'));
 	}
 
 	function setFullview(on) {
@@ -743,7 +757,7 @@
 		var f = line - i;
 		var y0 = ys[i];
 		var y1 = ys[Math.min(ys.length - 1, i + 1)];
-		$editor[0].scrollTop = y0 + f * (y1 - y0);
+		setSyncedScrollTop($editor[0], y0 + f * (y1 - y0));
 	}
 
 	function blockOffsetTop(block, container) {
@@ -781,10 +795,30 @@
 		return Math.max(0, el.scrollHeight - el.clientHeight);
 	}
 
+	/* Echo guard: a programmatic scrollTop write fires an async 'scroll' event on the
+	   TARGET pane. Without recognising it, that event syncs back to the source (two
+	   non-inverse mappings) and the panes ping-pong = visible jitter. We remember
+	   what we wrote and swallow the matching event. */
+	var scrollEcho = null;
+
+	function setSyncedScrollTop(el, y) {
+		y = Math.round(Math.max(0, Math.min(y, scrollMax(el))));
+		if (Math.abs(el.scrollTop - y) < 1) return;
+		scrollEcho = { el: el, top: y, at: Date.now() };
+		el.scrollTop = y;
+	}
+
+	function isScrollEcho(el) {
+		var e = scrollEcho;
+		if (!e || e.el !== el) return false;
+		scrollEcho = null;
+		return Date.now() - e.at < 250 && Math.abs(el.scrollTop - e.top) <= 2;
+	}
+
 	function syncScrollProportion(source, target) {
 		var sMax = scrollMax(source);
 		var tMax = scrollMax(target);
-		target.scrollTop = sMax <= 0 || tMax <= 0 ? 0 : (source.scrollTop / sMax) * tMax;
+		setSyncedScrollTop(target, sMax <= 0 || tMax <= 0 ? 0 : (source.scrollTop / sMax) * tMax);
 	}
 
 	function syncEditorToPreview() {
@@ -803,7 +837,7 @@
 		var span = Math.max(1, e - s + 1);
 		var progress = Math.min(1, Math.max(0, (line - s) / span));
 		var top = blockOffsetTop(block, out);
-		out.scrollTop = top + progress * block.offsetHeight;
+		setSyncedScrollTop(out, top + progress * block.offsetHeight);
 	}
 
 	function syncPreviewToEditor() {
@@ -837,20 +871,18 @@
 	}
 
 	function onScrollSyncScroll(fromEditor) {
-		if (!scrollSyncOn || syncingScroll) return;
-		syncingScroll = true;
+		if (!scrollSyncOn) return;
+		var src = fromEditor ? ($editor && $editor[0]) : document.getElementById('output');
+		if (!src || isScrollEcho(src)) return;
 		if (fromEditor) syncEditorToPreview();
 		else syncPreviewToEditor();
-		requestAnimationFrame(function () {
-			syncingScroll = false;
-		});
 	}
 
 	function setScrollSync(on) {
 		scrollSyncOn = !!on;
 		$('#scroll-sync-toggle').prop('checked', scrollSyncOn);
 		$('#scroll-sync-toggle').closest('label')
-			.attr('title', scrollSyncOn ? 'Sync scroll on' : 'Sync scroll off')
+			.attr('title', scrollSyncOn ? 'Scroll sync ON — editor and preview scroll together (click to turn off)' : 'Scroll sync OFF — click to make editor and preview scroll together')
 			.toggleClass('btn-active', scrollSyncOn);
 		storageSet(SCROLL_SYNC_KEY, scrollSyncOn ? '1' : '0');
 		if (scrollSyncOn) {
@@ -2761,8 +2793,8 @@
 			applyTheme(this.value);
 		});
 
-		$('#font-size-toggle').on('change', function () {
-			applyFontSize(this.checked ? 'large' : 'normal');
+		$('#font-size-select').on('change', function () {
+			applyFontSize(this.value);
 		});
 
 		$('#fullview-toggle').on('change', function () {
@@ -2847,6 +2879,7 @@
 				handle.removeEventListener('pointerup', up);
 				handle.removeEventListener('pointercancel', up);
 				document.body.classList.remove('is-resizing-panes');
+				if (scrollSyncOn) refreshScrollMaps();
 				if (pct !== null) storageSet(KEY, String(Math.round(pct * 10) / 10));
 			}
 			handle.addEventListener('pointermove', move);
@@ -2941,6 +2974,9 @@
 			langEn: 'English', langFa: 'Persian', templateBlank: 'Blank', templateNote: 'Note',
 			templateMeeting: 'Meeting', templateReadme: 'README', templateReport: 'Report',
 			noSnapshots: 'No snapshots yet.', snapshotSaved: 'Snapshot saved.',
+			snapshotHint: 'Save a restore point of this document now. A snapshot is also taken automatically each time you save to disk.',
+			restoreHint: 'Roll this document back to one of its saved snapshots (pick from the list).',
+			snapshotLocked: 'This document is locked — unlock it to take a snapshot.',
 			duplicate: 'Duplicate', openFile: 'Open file', newDoc: 'New document', save: 'Save',
 			exportDocx: 'Word (.docx)', frontMatter: 'Metadata',
 			wordExportFailed: 'Word export failed. Please try again.',
@@ -2958,6 +2994,9 @@
 			langEn: 'English', langFa: 'فارسی', templateBlank: 'خالی', templateNote: 'یادداشت',
 			templateMeeting: 'جلسه', templateReadme: 'README', templateReport: 'گزارش',
 			noSnapshots: 'نسخه‌ای نیست.', snapshotSaved: 'نسخه ذخیره شد.',
+			snapshotHint: 'همین حالا یک نقطه‌ی بازیابی از این سند ذخیره می‌کند. هر بار که روی دیسک ذخیره کنید هم خودکار یک نسخه گرفته می‌شود.',
+			restoreHint: 'سند را به یکی از نسخه‌های ذخیره‌شده برمی‌گرداند (از فهرست انتخاب کنید).',
+			snapshotLocked: 'این سند قفل است — برای گرفتن نسخه ابتدا قفل را باز کنید.',
 			duplicate: 'کپی', openFile: 'باز کردن فایل', newDoc: 'سند جدید', save: 'ذخیره',
 			exportDocx: 'Word (.docx)', frontMatter: 'متادیتا',
 			wordExportFailed: 'خروجی Word ناموفق بود. لطفاً دوباره تلاش کنید.',
@@ -3789,6 +3828,10 @@
 		document.getElementById('btn-snapshot').addEventListener('click', function () {
 			var doc = api.findDoc(api.docsState.activeId);
 			if (!doc) return;
+			if (doc.pinned) {
+				window.alert(t('snapshotLocked'));
+				return;
+			}
 			api.persistActiveFromEditor({ silentList: true });
 			pushSnapshot(doc, 'manual');
 			window.alert(t('snapshotSaved'));

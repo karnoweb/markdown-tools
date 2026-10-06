@@ -42,7 +42,6 @@
 
   .app-shell {
     position: relative;
-    height: calc(100dvh - 3rem);
     min-height: 0;
     padding: 0.5rem;
     gap: 0;

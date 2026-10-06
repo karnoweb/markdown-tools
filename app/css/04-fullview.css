@@ -14,9 +14,8 @@ body.fullview .mobile-view-toggle {
 }
 
 body.fullview .app-shell {
-  height: calc(100vh - 3.25rem);
-  height: calc(100dvh - 3.25rem);
-  max-height: calc(100dvh - 3.25rem);
+  flex: 1 1 0%;
+  min-height: 0;
   padding: 0.5rem 0.75rem 0.75rem;
   overflow: hidden;
 }

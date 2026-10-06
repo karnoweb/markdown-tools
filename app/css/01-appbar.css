@@ -132,11 +132,94 @@ label.swap.icon-btn.btn-active {
   color: oklch(var(--p));
 }
 
+.font-size-wrap .select {
+  min-height: 2rem;
+  height: 2rem;
+  font-size: 0.75rem;
+  width: 5.5rem;
+}
+
 .palette-wrap .select {
   min-height: 2rem;
   height: 2rem;
   font-size: 0.75rem;
-  max-width: 8.5rem;
+  max-width: 11.5rem;
+}
+
+/* ── Minimal footer (brand + product links) ───────────── */
+.app-footer {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 0.35rem 0.6rem;
+  height: 1.5rem;
+  padding: 0 0.75rem;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.68rem;
+  line-height: 1;
+  color: oklch(var(--bc) / 0.6);
+  border-top: 1px solid oklch(var(--b3));
+  background: oklch(var(--b2));
+  direction: ltr;
+}
+
+.app-footer a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-footer a:hover,
+.app-footer a:focus-visible {
+  color: oklch(var(--p));
+  text-decoration: underline;
+}
+
+.app-footer .footer-sep {
+  opacity: 0.4;
+}
+
+.app-footer .footer-links,
+.app-footer .footer-products {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.app-footer .footer-love {
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--rtlmd-font);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  color: oklch(var(--bc) / 0.7);
+}
+
+.app-footer .footer-heart {
+  display: inline-block;
+  color: oklch(var(--er));
+  margin-inline: 0.15em;
+  animation: footer-heartbeat 2.4s ease-in-out infinite;
+}
+
+@keyframes footer-heartbeat {
+  0%, 60%, 100% { transform: scale(1); }
+  70% { transform: scale(1.25); }
+  80% { transform: scale(1); }
+  90% { transform: scale(1.18); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-footer .footer-heart { animation: none; }
+}
+
+body.fullview .app-footer {
+  display: none;
 }
 
 /* ── Shell: sidebar + workspace ───────────────────────── */

@@ -53,6 +53,10 @@
 		document.getElementById('btn-snapshot').addEventListener('click', function () {
 			var doc = api.findDoc(api.docsState.activeId);
 			if (!doc) return;
+			if (doc.pinned) {
+				window.alert(t('snapshotLocked'));
+				return;
+			}
 			api.persistActiveFromEditor({ silentList: true });
 			pushSnapshot(doc, 'manual');
 			window.alert(t('snapshotSaved'));

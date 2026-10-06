@@ -42,17 +42,25 @@
 	}
 
 	function applyFontSize(size) {
-		var large = size === 'large';
-		document.documentElement.classList.toggle('font-large', large);
-		$('#font-size-toggle').prop('checked', large);
-		$('#font-size-toggle').closest('label')
-			.toggleClass('btn-active', large)
-			.attr('title', large ? 'Zoom out text' : 'Zoom in text');
+		size = normalizeFontSize(size);
+		document.documentElement.setAttribute('data-font-size', size);
+		$('#font-size-select').val(size);
 		storageSet(FONT_KEY, size);
+		/* line positions change with the text size */
+		if (scrollSyncOn) {
+			requestAnimationFrame(refreshScrollMaps);
+		}
+	}
+
+	/* 5 steps; legacy values 'normal'/'large' (old toggle) map to md/lg. */
+	function normalizeFontSize(size) {
+		if (size === 'normal') return 'md';
+		if (size === 'large') return 'lg';
+		return FONT_SIZES.indexOf(size) !== -1 ? size : 'md';
 	}
 
 	function initFontSize() {
-		applyFontSize(storageGet(FONT_KEY, 'normal'));
+		applyFontSize(storageGet(FONT_KEY, 'md'));
 	}
 
 	function setFullview(on) {
@@ -207,7 +215,7 @@
 		var f = line - i;
 		var y0 = ys[i];
 		var y1 = ys[Math.min(ys.length - 1, i + 1)];
-		$editor[0].scrollTop = y0 + f * (y1 - y0);
+		setSyncedScrollTop($editor[0], y0 + f * (y1 - y0));
 	}
 
 	function blockOffsetTop(block, container) {
@@ -245,10 +253,30 @@
 		return Math.max(0, el.scrollHeight - el.clientHeight);
 	}
 
+	/* Echo guard: a programmatic scrollTop write fires an async 'scroll' event on the
+	   TARGET pane. Without recognising it, that event syncs back to the source (two
+	   non-inverse mappings) and the panes ping-pong = visible jitter. We remember
+	   what we wrote and swallow the matching event. */
+	var scrollEcho = null;
+
+	function setSyncedScrollTop(el, y) {
+		y = Math.round(Math.max(0, Math.min(y, scrollMax(el))));
+		if (Math.abs(el.scrollTop - y) < 1) return;
+		scrollEcho = { el: el, top: y, at: Date.now() };
+		el.scrollTop = y;
+	}
+
+	function isScrollEcho(el) {
+		var e = scrollEcho;
+		if (!e || e.el !== el) return false;
+		scrollEcho = null;
+		return Date.now() - e.at < 250 && Math.abs(el.scrollTop - e.top) <= 2;
+	}
+
 	function syncScrollProportion(source, target) {
 		var sMax = scrollMax(source);
 		var tMax = scrollMax(target);
-		target.scrollTop = sMax <= 0 || tMax <= 0 ? 0 : (source.scrollTop / sMax) * tMax;
+		setSyncedScrollTop(target, sMax <= 0 || tMax <= 0 ? 0 : (source.scrollTop / sMax) * tMax);
 	}
 
 	function syncEditorToPreview() {
@@ -267,7 +295,7 @@
 		var span = Math.max(1, e - s + 1);
 		var progress = Math.min(1, Math.max(0, (line - s) / span));
 		var top = blockOffsetTop(block, out);
-		out.scrollTop = top + progress * block.offsetHeight;
+		setSyncedScrollTop(out, top + progress * block.offsetHeight);
 	}
 
 	function syncPreviewToEditor() {
@@ -301,20 +329,18 @@
 	}
 
 	function onScrollSyncScroll(fromEditor) {
-		if (!scrollSyncOn || syncingScroll) return;
-		syncingScroll = true;
+		if (!scrollSyncOn) return;
+		var src = fromEditor ? ($editor && $editor[0]) : document.getElementById('output');
+		if (!src || isScrollEcho(src)) return;
 		if (fromEditor) syncEditorToPreview();
 		else syncPreviewToEditor();
-		requestAnimationFrame(function () {
-			syncingScroll = false;
-		});
 	}
 
 	function setScrollSync(on) {
 		scrollSyncOn = !!on;
 		$('#scroll-sync-toggle').prop('checked', scrollSyncOn);
 		$('#scroll-sync-toggle').closest('label')
-			.attr('title', scrollSyncOn ? 'Sync scroll on' : 'Sync scroll off')
+			.attr('title', scrollSyncOn ? 'Scroll sync ON — editor and preview scroll together (click to turn off)' : 'Scroll sync OFF — click to make editor and preview scroll together')
 			.toggleClass('btn-active', scrollSyncOn);
 		storageSet(SCROLL_SYNC_KEY, scrollSyncOn ? '1' : '0');
 		if (scrollSyncOn) {
