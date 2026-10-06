@@ -45,6 +45,8 @@ jobs:
           cp build/icon.iconset/icon_512x512.png build/icon.iconset/icon_256x256@2x.png
           rm build/icon.iconset/icon_64x64.png
           iconutil -c icns build/icon.iconset -o build/icon.icns
+          # file-association icon would collide with the app icon on mac (EEXIST) — CI-only tweak
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.build.fileAssociations.forEach(a=>delete a.icon);fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
       - run: npm run ${{ matrix.script }} -- --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
