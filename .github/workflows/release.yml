@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            name: windows
+          - os: ubuntu-latest
+            script: dist:linux
+            name: linux
+          - os: macos-latest
+            script: dist:mac
+            name: mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run ${{ matrix.script }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          if-no-files-found: error
+          path: |
+            dist/*.exe
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.dmg
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Create release with download links
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          BASE="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}"
+          link() { # $1 = label, $2 = glob
+            for f in $2; do
+              [ -e "$f" ] && echo "- **$1:** [$(basename "$f")](${BASE}/$(basename "$f"))"
+            done
+          }
+          {
+            echo "## Downloads"
+            echo
+            echo "### Windows"
+            link "Installer" "artifacts/windows/*-win-setup.exe"
+            link "Portable" "artifacts/windows/*-win-portable.exe"
+            echo
+            echo "### Linux"
+            link "AppImage" "artifacts/linux/*.AppImage"
+            link "Debian/Ubuntu (.deb)" "artifacts/linux/*.deb"
+            echo
+            echo "### macOS"
+            link "DMG" "artifacts/mac/*.dmg"
+            echo
+            echo "## Notes"
+            echo
+            echo "- Web/PWA: pull and hard-refresh."
+            echo "- macOS/Windows builds are unsigned; the OS may show a security warning on first launch."
+          } > notes.md
+          gh release create "$TAG" --title "$TAG" --notes-file notes.md artifacts/*/*

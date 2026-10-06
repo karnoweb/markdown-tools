@@ -52,15 +52,15 @@
 		<link id="prism-theme" href="assets/vendor/prism/themes/prism-tomorrow.min.css" rel="stylesheet">
 		<link href="assets/vendor/tailwind.css" rel="stylesheet">
 		<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
-		<link rel="stylesheet" href="app/css/00-tokens-base.css?v=1">
-		<link rel="stylesheet" href="app/css/01-appbar.css?v=1">
-		<link rel="stylesheet" href="app/css/02-sidebar.css?v=1">
-		<link rel="stylesheet" href="app/css/03-editor.css?v=1">
-		<link rel="stylesheet" href="app/css/04-fullview.css?v=1">
-		<link rel="stylesheet" href="app/css/05-preview.css?v=1">
-		<link rel="stylesheet" href="app/css/06-responsive.css?v=1">
-		<link rel="stylesheet" href="app/css/07-components.css?v=1">
-		<link rel="stylesheet" href="app/css/08-settings.css?v=1">
+		<link rel="stylesheet" href="app/css/00-tokens-base.css?v=2">
+		<link rel="stylesheet" href="app/css/01-appbar.css?v=2">
+		<link rel="stylesheet" href="app/css/02-sidebar.css?v=2">
+		<link rel="stylesheet" href="app/css/03-editor.css?v=2">
+		<link rel="stylesheet" href="app/css/04-fullview.css?v=2">
+		<link rel="stylesheet" href="app/css/05-preview.css?v=2">
+		<link rel="stylesheet" href="app/css/06-responsive.css?v=2">
+		<link rel="stylesheet" href="app/css/07-components.css?v=2">
+		<link rel="stylesheet" href="app/css/08-settings.css?v=2">
 	</head>
 	<body>
 		<header id="header" class="app-bar">
@@ -124,9 +124,6 @@
 				</button>
 				<button type="button" id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings">
 					<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-				</button>
-				<button type="button" id="pwa-install" class="icon-btn hidden" title="Install app" aria-label="Install app">
-					<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
 				</button>
 			</div>
 		</header>
@@ -218,6 +215,7 @@
 						<textarea aria-label="Markdown editor" spellcheck="false"></textarea>
 					</div>
 				</div>
+				<div id="pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" title="Drag to resize (double-click to reset)"></div>
 				<div class="editor-pane editor-pane--preview">
 					<div class="pane-header pane-header--preview">
 						<span data-i18n="preview">Preview</span>
@@ -281,6 +279,6 @@
 		<script src="assets/vendor/mermaid/mermaid.min.js"></script>
 		<script src="assets/vendor/html-to-image/html-to-image.js"></script>
 		<script src="assets/vendor/katex/katex.min.js"></script>
-		<script src="app/js/rtlmd.bundle.js?v=3"></script>
+		<script src="app/js/rtlmd.bundle.js?v=4"></script>
 	</body>
 </html>

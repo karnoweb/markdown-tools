@@ -9,6 +9,40 @@
   align-items: stretch;
 }
 
+.pane-splitter {
+  flex: 0 0 0.5rem;
+  margin-inline: -0.3rem;
+  cursor: col-resize;
+  border-radius: 0.25rem;
+  touch-action: none;
+  z-index: 2;
+  transition: background-color 0.15s;
+}
+
+.pane-splitter:hover,
+body.is-resizing-panes .pane-splitter {
+  background: oklch(var(--bc) / 0.18);
+}
+
+body.is-resizing-panes {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.fullview .pane-splitter {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .pane-splitter {
+    display: none;
+  }
+
+  #textbox.editor-pane {
+    flex: 1 1 0% !important;
+  }
+}
+
 #textbox,
 #output,
 .editor-pane {

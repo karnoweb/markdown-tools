@@ -2818,41 +2818,45 @@
 		return /Electron\//.test(navigator.userAgent);
 	}
 
-	function isStandalonePwa() {
-		return window.matchMedia('(display-mode: standalone)').matches ||
-			window.matchMedia('(display-mode: window-controls-overlay)').matches ||
-			!!window.navigator.standalone;
-	}
+	function initPaneSplitter() {
+		var KEY = 'rtlmd.editorPaneWidth';
+		var ws = document.getElementById('editor');
+		var pane = document.getElementById('textbox');
+		var handle = document.getElementById('pane-splitter');
+		if (!ws || !pane || !handle) return;
 
-	function initPwaInstall() {
-		if (isDesktopShell() || isStandalonePwa()) return;
+		function clamp(p) { return Math.min(80, Math.max(15, p)); }
+		function apply(p) { pane.style.flex = '0 0 ' + p + '%'; }
 
-		var btn = document.getElementById('pwa-install');
-		if (!btn) return;
+		var saved = parseFloat(storageGet(KEY, ''));
+		if (saved > 0) apply(clamp(saved));
 
-		var deferredInstall = null;
-
-		window.addEventListener('beforeinstallprompt', function (e) {
+		handle.addEventListener('pointerdown', function (e) {
+			if (e.button !== 0) return;
 			e.preventDefault();
-			deferredInstall = e;
-			btn.classList.remove('hidden');
-		});
-
-		btn.addEventListener('click', function () {
-			if (!deferredInstall) {
-				window.alert('Install from the browser menu:\nChrome/Edge → Install Markdown Tools\n(or ⋮ → Apps → Install this site as an app)');
-				return;
+			var rect = ws.getBoundingClientRect();
+			var pct = null;
+			handle.setPointerCapture(e.pointerId);
+			document.body.classList.add('is-resizing-panes');
+			function move(ev) {
+				pct = clamp(((ev.clientX - rect.left) / rect.width) * 100);
+				apply(pct);
 			}
-			deferredInstall.prompt();
-			deferredInstall.userChoice.then(function () {
-				deferredInstall = null;
-				btn.classList.add('hidden');
-			});
+			function up() {
+				handle.removeEventListener('pointermove', move);
+				handle.removeEventListener('pointerup', up);
+				handle.removeEventListener('pointercancel', up);
+				document.body.classList.remove('is-resizing-panes');
+				if (pct !== null) storageSet(KEY, String(Math.round(pct * 10) / 10));
+			}
+			handle.addEventListener('pointermove', move);
+			handle.addEventListener('pointerup', up);
+			handle.addEventListener('pointercancel', up);
 		});
 
-		window.addEventListener('appinstalled', function () {
-			deferredInstall = null;
-			btn.classList.add('hidden');
+		handle.addEventListener('dblclick', function () {
+			pane.style.flex = '';
+			storageSet(KEY, '');
 		});
 	}
 
@@ -2904,7 +2908,7 @@
 			window.initRtlmdExtras(buildRtlmdApi());
 		}
 		loadInitialContent();
-		initPwaInstall();
+		initPaneSplitter();
 		registerServiceWorker();
 	});
 
