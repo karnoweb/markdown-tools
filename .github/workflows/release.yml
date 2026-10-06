@@ -31,6 +31,20 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      - name: Generate icon.icns (macOS)
+        if: matrix.name == 'mac'
+        run: |
+          npm run icons
+          mkdir build/icon.iconset
+          for s in 16 32 64 128 256 512; do
+            sips -z $s $s build/icon.png --out build/icon.iconset/icon_${s}x${s}.png
+          done
+          cp build/icon.iconset/icon_32x32.png build/icon.iconset/icon_16x16@2x.png
+          cp build/icon.iconset/icon_64x64.png build/icon.iconset/icon_32x32@2x.png
+          cp build/icon.iconset/icon_256x256.png build/icon.iconset/icon_128x128@2x.png
+          cp build/icon.iconset/icon_512x512.png build/icon.iconset/icon_256x256@2x.png
+          rm build/icon.iconset/icon_64x64.png
+          iconutil -c icns build/icon.iconset -o build/icon.icns
       - run: npm run ${{ matrix.script }} -- --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
