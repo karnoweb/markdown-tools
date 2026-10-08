@@ -8,6 +8,7 @@
 			buildTocFromHtml();
 			updateWordCount();
 			syncLineNumbers();
+			liveAfterPreview();
 		};
 	}
 
@@ -61,6 +62,7 @@
 			pushSnapshot(doc, 'manual');
 			window.alert(t('snapshotSaved'));
 		});
+		document.getElementById('btn-clear').addEventListener('click', clearActiveDocument);
 		document.getElementById('btn-restore-snapshot').addEventListener('click', openSnapshotDialog);
 
 		document.addEventListener('keydown', function (e) {
@@ -111,5 +113,6 @@
 		syncLineNumbers();
 		updateWordCount();
 		syncTocVisibility();
+		applyViewMode(storageGet(VIEW_MODE_KEY, 'split'), true);
 		if (api.renderPreview) api.renderPreview();
 	};

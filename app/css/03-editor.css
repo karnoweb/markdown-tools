@@ -325,3 +325,9 @@ body.fullview .pane-splitter {
   width: 100%;
   margin-inline: 0;
 }
+
+/* Clear button sits next to the Preview title; free space goes to its right */
+#btn-clear {
+  margin-inline-start: 0.35rem;
+  margin-inline-end: auto;
+}

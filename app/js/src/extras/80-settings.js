@@ -50,6 +50,7 @@
 		dlg.querySelector('#set-autosave').checked = storageGet(AUTOSAVE_KEY, '0') === '1';
 		dlg.querySelector('#set-linenum').checked = storageGet(LINE_NUM_KEY, '0') === '1';
 		dlg.querySelector('#set-toc').checked = storageGet(TOC_KEY, '1') !== '0';
+		dlg.querySelector('#set-viewmode').value = normalizeViewMode(storageGet(VIEW_MODE_KEY, 'split'));
 		dlg.showModal();
 	}
 
@@ -66,5 +67,6 @@
 		setupAutosave();
 		syncLineNumbers();
 		syncTocVisibility();
+		applyViewMode(dlg.querySelector('#set-viewmode').value);
 		dlg.close();
 	}

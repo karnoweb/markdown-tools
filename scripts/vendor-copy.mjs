@@ -138,6 +138,11 @@ async function main() {
 		path.join(vendor, 'dompurify', 'purify.min.js')
 	);
 
+	copyFile(
+		path.join(nm, 'turndown', 'lib', 'turndown.browser.umd.js'),
+		path.join(vendor, 'turndown', 'turndown.min.js')
+	);
+
 	const prismRoot = path.join(nm, 'prismjs');
 	copyFile(path.join(prismRoot, 'prism.js'), path.join(vendor, 'prism', 'prism.min.js'));
 	copyDir(path.join(prismRoot, 'themes'), path.join(vendor, 'prism', 'themes'));

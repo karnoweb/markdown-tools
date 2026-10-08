@@ -1,7 +1,7 @@
 {
   "name": "markdown-tools",
   "productName": "Markdown Tools",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "RTL Markdown editor with live preview and export",
   "author": "karnoweb",
   "license": "MIT",
@@ -118,5 +118,8 @@
       "uninstallerIcon": "icon.ico",
       "include": "installer.nsh"
     }
+  },
+  "dependencies": {
+    "turndown": "^7.2.4"
   }
 }

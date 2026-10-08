@@ -140,3 +140,80 @@ body.fullview #output.markdown-body {
 }
 
 /* ── Markdown output ──────────────────────────────────── */
+
+/* ── Live view mode (preview edited in place; editor pane hidden) ── */
+body.live-mode #textbox,
+body.live-mode .pane-splitter,
+body.live-mode .mobile-view-toggle {
+  display: none !important;
+}
+
+body.live-mode .editor-pane--preview,
+body.live-mode.mobile-view-editor .editor-pane--preview,
+body.live-mode.mobile-view-preview .editor-pane--preview {
+  display: flex !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+
+body.live-mode .live-hint {
+  margin-inline: 0.75rem;
+  font-size: 0.75rem;
+  color: oklch(var(--wa, var(--bc)));
+}
+
+body.live-mode #output [contenteditable="true"] {
+  cursor: text;
+  outline: none;
+  border-radius: 0.25rem;
+  transition: box-shadow 0.12s;
+}
+
+body.live-mode #output [contenteditable="true"]:hover {
+  box-shadow: 0 0 0 0.25rem oklch(var(--bc) / 0.05);
+}
+
+body.live-mode #output [contenteditable="true"]:focus {
+  box-shadow: 0 0 0 0.25rem oklch(var(--p) / 0.18);
+}
+
+body.live-mode #output [data-live-ph] {
+  min-height: 1.5em;
+}
+
+body.live-mode #output .live-src {
+  cursor: default;
+  border-radius: 0.25rem;
+}
+
+body.live-mode #output .live-src:hover {
+  box-shadow: 0 0 0 0.25rem oklch(var(--bc) / 0.05);
+}
+
+body.live-mode #output:empty {
+  min-height: 40vh;
+  cursor: text;
+}
+
+body.live-mode #output:empty::before {
+  content: attr(data-empty-hint);
+  opacity: 0.5;
+}
+
+#output textarea.live-src-edit {
+  display: block;
+  width: 100%;
+  min-height: 4rem;
+  margin: 0.5em 0;
+  padding: 0.6rem 0.75rem;
+  resize: vertical;
+  font-family: 'Fira Code', ui-monospace, monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
+  color: inherit;
+  background: oklch(var(--b2));
+  border: 1px solid oklch(var(--p) / 0.5);
+  border-radius: 0.5rem;
+  outline: none;
+}
