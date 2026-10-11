@@ -31,25 +31,31 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Generate icon.icns (macOS)
+
+      - name: Build Windows / Linux
+        if: matrix.name != 'mac'
+        run: npm run ${{ matrix.script }} -- --publish never
+
+      - name: Build macOS
         if: matrix.name == 'mac'
-        run: |
-          npm run icons
-          mkdir build/icon.iconset
-          for s in 16 32 64 128 256 512; do
-            sips -z $s $s build/icon.png --out build/icon.iconset/icon_${s}x${s}.png
-          done
-          cp build/icon.iconset/icon_32x32.png build/icon.iconset/icon_16x16@2x.png
-          cp build/icon.iconset/icon_64x64.png build/icon.iconset/icon_32x32@2x.png
-          cp build/icon.iconset/icon_256x256.png build/icon.iconset/icon_128x128@2x.png
-          cp build/icon.iconset/icon_512x512.png build/icon.iconset/icon_256x256@2x.png
-          rm build/icon.iconset/icon_64x64.png
-          iconutil -c icns build/icon.iconset -o build/icon.icns
-          # file-association icon would collide with the app icon on mac (EEXIST) — CI-only tweak
-          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.build.fileAssociations.forEach(a=>delete a.icon);fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
-      - run: npm run ${{ matrix.script }} -- --publish never
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "${CSC_LINK:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ]; then
+            echo "Signing + notarizing macOS build"
+            npm run dist:mac -- --publish never
+          else
+            echo "::warning::Mac signing/notarization secrets missing — building unsigned. Downloaded DMGs will show Gatekeeper 'damaged' errors. Add CSC_LINK, CSC_KEY_PASSWORD, and notarization secrets (see build/mac-release.env.example)."
+            npm run dist:mac:unsigned -- --publish never
+          fi
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
@@ -96,6 +102,7 @@ jobs:
             echo "## Notes"
             echo
             echo "- Web/PWA: pull and hard-refresh."
-            echo "- macOS/Windows builds are unsigned; the OS may show a security warning on first launch."
+            echo "- macOS release builds require Developer ID signing + notarization (CI secrets). Unsigned mac builds are blocked by Gatekeeper when downloaded."
+            echo "- Windows builds are unsigned; the OS may show a security warning on first launch."
           } > notes.md
           gh release create "$TAG" --title "$TAG" --notes-file notes.md artifacts/*/*

@@ -1,7 +1,7 @@
 {
   "name": "markdown-tools",
   "productName": "Markdown Tools",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "description": "RTL Markdown editor with live preview and export",
   "author": "karnoweb",
   "license": "MIT",
@@ -23,7 +23,10 @@
     "patch:win": "node scripts/patch-win-exe.mjs",
     "dist:win": "npm run vendor && npm run pack:win && npm run patch:win && electron-builder --win nsis portable --prepackaged .build/electron/win-unpacked",
     "dist:linux": "npm run vendor && electron-builder --linux",
-    "dist:mac": "npm run vendor && electron-builder --mac"
+    "dist:mac": "npm run vendor && node scripts/build-mac.mjs",
+    "dist:mac:unsigned": "npm run vendor && node scripts/build-mac.mjs --unsigned",
+    "pack:mac": "npm run vendor && node scripts/build-mac.mjs --unsigned --dir",
+    "verify:mac": "node scripts/verify-mac-app.mjs"
   },
   "devDependencies": {
     "daisyui": "4.12.24",
@@ -65,16 +68,14 @@
         "name": "Markdown Tools",
         "description": "Markdown document",
         "role": "Editor",
-        "mimeType": "text/markdown",
-        "icon": "icon.ico"
+        "mimeType": "text/markdown"
       },
       {
         "ext": "markdown",
         "name": "Markdown Tools",
         "description": "Markdown document",
         "role": "Editor",
-        "mimeType": "text/markdown",
-        "icon": "icon.ico"
+        "mimeType": "text/markdown"
       }
     ],
     "win": {
@@ -96,10 +97,23 @@
     },
     "mac": {
       "icon": "icon.png",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "notarize": true,
       "target": [
-        "dmg"
-      ],
-      "category": "public.app-category.productivity"
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ]
+    },
+    "dmg": {
+      "sign": true
     },
     "artifactName": "Markdown-Tools-${version}-${os}-${arch}.${ext}",
     "portable": {

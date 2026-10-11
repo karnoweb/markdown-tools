@@ -570,8 +570,10 @@
 		$('#textbox textarea').attr('dir', dir);
 		$('#output').attr('dir', dir);
 		$('#dir-toggle').prop('checked', rtl);
+		var $dirLabel = $('#dir-toggle-label');
+		if ($dirLabel.length) $dirLabel.text(rtl ? 'RTL' : 'LTR');
 		$('#dir-toggle').closest('label')
-			.attr('title', rtl ? 'Switch to left to right' : 'Switch to right to left')
+			.attr('title', rtl ? t('dirToLtr') : t('dirToRtl'))
 			.toggleClass('btn-active', rtl);
 		storageSet(DIR_KEY, dir);
 		if (!skipRender) {
@@ -1371,12 +1373,9 @@
 
 	function refreshActiveTitleUi(flash) {
 		var doc = findDoc(docsState.activeId);
-		var el = document.getElementById('active-doc-title');
+		var el = document.getElementById('doc-save');
 		if (!el || !doc) return;
-		var title = doc.title || UNTITLED;
 		var dirty = isActiveDocDiskDirty();
-		el.textContent = dirty ? title + ' ●' : title;
-		el.title = doc.sourcePath || title;
 		el.classList.toggle('is-dirty', dirty);
 		if (flash === 'saved') {
 			el.classList.add('is-saved-flash');
@@ -2968,14 +2967,16 @@
 			backupImport: 'Import backup', newFromTemplate: 'New from template', settings: 'Settings',
 			find: 'Find', replace: 'Replace', findNext: 'Next', findPrev: 'Previous', replaceOne: 'Replace',
 			replaceAll: 'Replace all', close: 'Close', toc: 'Contents', wordCount: 'words',
-			charCount: 'chars', readTime: 'min read', unsavedDiskLeave: 'This file has unsaved changes on disk. Leave anyway?',
-			snapshot: 'Snapshot', restoreSnapshot: 'Restore snapshot', spellcheck: 'Spellcheck',
+			charCount: 'chars', readTime: 'min read', readTimeShort: 'm',
+			unsavedDiskLeave: 'This file has unsaved changes on disk. Leave anyway?',
+			saveHint: 'Save to disk (Ctrl+S). A restore point is saved automatically.',
+			dirToRtl: 'Switch to right-to-left (RTL)', dirToLtr: 'Switch to left-to-right (LTR)',
+			restoreSnapshot: 'Restore snapshot', spellcheck: 'Spellcheck',
 			autosaveDisk: 'Autosave to disk (linked files)', lineNumbers: 'Line numbers', language: 'Language',
 			langEn: 'English', langFa: 'Persian', templateBlank: 'Blank', templateNote: 'Note',
 			templateMeeting: 'Meeting', templateReadme: 'README', templateReport: 'Report',
 			noSnapshots: 'No snapshots yet.', snapshotSaved: 'Snapshot saved.',
-			snapshotHint: 'Save a restore point of this document now. A snapshot is also taken automatically each time you save to disk.',
-			restoreHint: 'Roll this document back to one of its saved snapshots (pick from the list).',
+			restoreHint: 'Roll back to a previous version (from save history). Pick from the list.',
 			snapshotLocked: 'This document is locked — unlock it to take a snapshot.',
 			duplicate: 'Duplicate', openFile: 'Open file', newDoc: 'New document', save: 'Save',
 			exportDocx: 'Word (.docx)', frontMatter: 'Metadata',
@@ -2988,14 +2989,16 @@
 			backupImport: 'ورود پشتیبان', newFromTemplate: 'سند از قالب', settings: 'تنظیمات',
 			find: 'جستجو', replace: 'جایگزینی', findNext: 'بعدی', findPrev: 'قبلی', replaceOne: 'جایگزین',
 			replaceAll: 'همه', close: 'بستن', toc: 'فهرست', wordCount: 'کلمه',
-			charCount: 'کاراکتر', readTime: 'دقیقه مطالعه', unsavedDiskLeave: 'تغییرات ذخیره‌نشده روی دیسک دارید. خارج شوید؟',
-			snapshot: 'نسخه', restoreSnapshot: 'بازیابی نسخه', spellcheck: 'املاء',
+			charCount: 'کاراکتر', readTime: 'دقیقه مطالعه', readTimeShort: 'د',
+			unsavedDiskLeave: 'تغییرات ذخیره‌نشده روی دیسک دارید. خارج شوید؟',
+			saveHint: 'ذخیره روی دیسک (Ctrl+S). نسخهٔ بازیابی خودکار گرفته می‌شود.',
+			dirToRtl: 'راست‌به‌چپ (RTL)', dirToLtr: 'چپ‌به‌راست (LTR)',
+			restoreSnapshot: 'بازیابی نسخه', spellcheck: 'املاء',
 			autosaveDisk: 'ذخیره خودکار روی دیسک', lineNumbers: 'شماره خط', language: 'زبان',
 			langEn: 'English', langFa: 'فارسی', templateBlank: 'خالی', templateNote: 'یادداشت',
 			templateMeeting: 'جلسه', templateReadme: 'README', templateReport: 'گزارش',
 			noSnapshots: 'نسخه‌ای نیست.', snapshotSaved: 'نسخه ذخیره شد.',
-			snapshotHint: 'همین حالا یک نقطه‌ی بازیابی از این سند ذخیره می‌کند. هر بار که روی دیسک ذخیره کنید هم خودکار یک نسخه گرفته می‌شود.',
-			restoreHint: 'سند را به یکی از نسخه‌های ذخیره‌شده برمی‌گرداند (از فهرست انتخاب کنید).',
+			restoreHint: 'برگشت به نسخهٔ قبلی (تاریخچهٔ ذخیره). از فهرست انتخاب کنید.',
 			snapshotLocked: 'این سند قفل است — برای گرفتن نسخه ابتدا قفل را باز کنید.',
 			duplicate: 'کپی', openFile: 'باز کردن فایل', newDoc: 'سند جدید', save: 'ذخیره',
 			exportDocx: 'Word (.docx)', frontMatter: 'متادیتا',
@@ -3235,7 +3238,14 @@
 			var key = el.getAttribute('data-i18n-title');
 			if (key) el.setAttribute('title', t(key));
 		});
+		document.querySelectorAll('[data-i18n-aria]').forEach(function (el) {
+			var key = el.getAttribute('data-i18n-aria');
+			if (key) el.setAttribute('aria-label', t(key));
+		});
 		document.documentElement.lang = lang();
+		if (typeof applyDirection === 'function') {
+			applyDirection(storageGet(DIR_KEY, 'ltr'), true);
+		}
 	}
 
 	function countStats(text) {
@@ -3252,8 +3262,7 @@
 		var ed = api.getEditor();
 		var text = ed && ed.length ? ed.val() : '';
 		var st = countStats(text);
-		el.textContent = st.words + ' ' + t('wordCount') + ' · ' + st.chars + ' ' + t('charCount') +
-			' · ~' + st.mins + ' ' + t('readTime');
+		el.textContent = st.words + 'w · ' + st.chars + 'c · ~' + st.mins + t('readTimeShort');
 	}
 
 	function tocEnabledInSettings() {
@@ -4016,7 +4025,6 @@
 			return;
 		}
 		if (!$editor.val().trim()) return;
-		if (!window.confirm(t('clearConfirm'))) return;
 		if (api) api.persistActiveFromEditor({ silentList: true });
 		pushSnapshot(doc, 'clear');
 		$editor.val('');
@@ -4377,17 +4385,6 @@
 			this.value = '';
 		});
 
-		document.getElementById('btn-snapshot').addEventListener('click', function () {
-			var doc = api.findDoc(api.docsState.activeId);
-			if (!doc) return;
-			if (doc.pinned) {
-				window.alert(t('snapshotLocked'));
-				return;
-			}
-			api.persistActiveFromEditor({ silentList: true });
-			pushSnapshot(doc, 'manual');
-			window.alert(t('snapshotSaved'));
-		});
 		document.getElementById('btn-clear').addEventListener('click', clearActiveDocument);
 		document.getElementById('btn-restore-snapshot').addEventListener('click', openSnapshotDialog);
 

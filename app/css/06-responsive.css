@@ -100,10 +100,6 @@
     padding-inline: 0.75rem;
   }
 
-  .pane-doc-title {
-    max-width: 45%;
-  }
-
   .md-toolbar {
     flex-wrap: nowrap;
     overflow-x: auto;

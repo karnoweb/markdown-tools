@@ -13,7 +13,14 @@
 			var key = el.getAttribute('data-i18n-title');
 			if (key) el.setAttribute('title', t(key));
 		});
+		document.querySelectorAll('[data-i18n-aria]').forEach(function (el) {
+			var key = el.getAttribute('data-i18n-aria');
+			if (key) el.setAttribute('aria-label', t(key));
+		});
 		document.documentElement.lang = lang();
+		if (typeof applyDirection === 'function') {
+			applyDirection(storageGet(DIR_KEY, 'ltr'), true);
+		}
 	}
 
 	function countStats(text) {
@@ -30,8 +37,7 @@
 		var ed = api.getEditor();
 		var text = ed && ed.length ? ed.val() : '';
 		var st = countStats(text);
-		el.textContent = st.words + ' ' + t('wordCount') + ' · ' + st.chars + ' ' + t('charCount') +
-			' · ~' + st.mins + ' ' + t('readTime');
+		el.textContent = st.words + 'w · ' + st.chars + 'c · ~' + st.mins + t('readTimeShort');
 	}
 
 	function tocEnabledInSettings() {

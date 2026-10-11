@@ -114,17 +114,6 @@ body.fullview .pane-splitter {
   overflow: hidden;
 }
 
-.pane-doc-title {
-  font-weight: 500;
-  opacity: 0.7;
-  max-width: 55%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: none;
-  letter-spacing: 0;
-}
-
 .doc-save-btn {
   flex-shrink: 0;
 }
@@ -134,12 +123,11 @@ body.fullview .pane-splitter {
   cursor: not-allowed;
 }
 
-.pane-doc-title.is-dirty {
-  opacity: 0.95;
+.doc-save-btn.is-dirty {
+  color: oklch(var(--wa));
 }
 
-.pane-doc-title.is-saved-flash {
-  opacity: 1;
+.doc-save-btn.is-saved-flash {
   color: oklch(var(--su));
 }
 

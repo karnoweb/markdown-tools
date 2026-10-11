@@ -521,7 +521,6 @@
 			return;
 		}
 		if (!$editor.val().trim()) return;
-		if (!window.confirm(t('clearConfirm'))) return;
 		if (api) api.persistActiveFromEditor({ silentList: true });
 		pushSnapshot(doc, 'clear');
 		$editor.val('');

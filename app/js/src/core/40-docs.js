@@ -424,12 +424,9 @@
 
 	function refreshActiveTitleUi(flash) {
 		var doc = findDoc(docsState.activeId);
-		var el = document.getElementById('active-doc-title');
+		var el = document.getElementById('doc-save');
 		if (!el || !doc) return;
-		var title = doc.title || UNTITLED;
 		var dirty = isActiveDocDiskDirty();
-		el.textContent = dirty ? title + ' ●' : title;
-		el.title = doc.sourcePath || title;
 		el.classList.toggle('is-dirty', dirty);
 		if (flash === 'saved') {
 			el.classList.add('is-saved-flash');

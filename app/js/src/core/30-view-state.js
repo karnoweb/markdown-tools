@@ -28,8 +28,10 @@
 		$('#textbox textarea').attr('dir', dir);
 		$('#output').attr('dir', dir);
 		$('#dir-toggle').prop('checked', rtl);
+		var $dirLabel = $('#dir-toggle-label');
+		if ($dirLabel.length) $dirLabel.text(rtl ? 'RTL' : 'LTR');
 		$('#dir-toggle').closest('label')
-			.attr('title', rtl ? 'Switch to left to right' : 'Switch to right to left')
+			.attr('title', rtl ? t('dirToLtr') : t('dirToRtl'))
 			.toggleClass('btn-active', rtl);
 		storageSet(DIR_KEY, dir);
 		if (!skipRender) {
