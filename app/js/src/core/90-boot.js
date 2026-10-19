@@ -5,6 +5,7 @@
 		initTheme();
 		initDirection();
 		initFontSize();
+		initFontFamily();
 		initFullview();
 		initScrollSync();
 		initSidebar();
@@ -25,6 +26,10 @@
 
 		$('#font-size-select').on('change', function () {
 			applyFontSize(this.value);
+		});
+
+		$('#font-family-select').on('change', function () {
+			applyFontFamily(this.value);
 		});
 
 		$('#fullview-toggle').on('change', function () {

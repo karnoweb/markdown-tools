@@ -15,6 +15,7 @@
 		highlightCode();
 		attachCodeCopyButtons();
 		renderMermaid();
+		enhancePreviewImages();
 		refreshScrollMaps();
 		if (typeof window.rtlmdAfterPreview === 'function') {
 			window.rtlmdAfterPreview();

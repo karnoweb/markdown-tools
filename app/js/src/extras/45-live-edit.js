@@ -24,20 +24,36 @@
 	Object.assign(STR.en, {
 		clearDoc: 'Clear', clearHint: 'Clear the whole document (a snapshot is saved first)',
 		clearConfirm: 'Clear the entire document? A snapshot will be saved so you can restore it.',
+		copyDocHint: 'Copy entire document as Markdown',
+		copyDocDone: 'Copied',
+		copyDocFail: 'Copy failed',
 		viewMode: 'View mode', viewModeSplit: 'Split (editor + preview)',
 		viewModeLive: 'Live (edit the preview directly)',
 		liveUnmapped: 'Live editing unavailable for this document (unsupported structure). Switch to Split mode.',
 		livePasteHint: 'Paste Markdown here (Ctrl+V) or click to start typing',
-		liveSrcHint: 'Double-click to edit source'
+		liveSrcHint: 'Double-click or click </> to edit Markdown source',
+		splitBlockHint: 'Double-click or click </> to edit this block’s Markdown source',
+		editBlockSource: 'Edit block source',
+		editBlockSourceHint: 'Ctrl+Enter to save · Esc to cancel',
+		saveBlockSource: 'Save',
+		inlineToolbarAria: 'Formatting toolbar'
 	});
 	Object.assign(STR.fa, {
 		clearDoc: 'پاک‌کردن', clearHint: 'پاک‌کردن کل سند (قبلش یک نسخه ذخیره می‌شود)',
 		clearConfirm: 'کل سند پاک شود؟ قبلش یک نسخه ذخیره می‌شود تا بتوانید بازیابی کنید.',
+		copyDocHint: 'کپی کل سند به‌صورت Markdown',
+		copyDocDone: 'کپی شد',
+		copyDocFail: 'کپی ناموفق',
 		viewMode: 'حالت نمایش', viewModeSplit: 'دوتایی (ویرایشگر + پیش‌نمایش)',
 		viewModeLive: 'زنده (ویرایش مستقیم پیش‌نمایش)',
 		liveUnmapped: 'ویرایش زنده برای این سند ممکن نیست (ساختار پشتیبانی‌نشده). به حالت دوتایی بروید.',
 		livePasteHint: 'Markdown را اینجا پیست کنید (Ctrl+V) یا شروع به نوشتن کنید',
-		liveSrcHint: 'برای ویرایش سورس دوبار کلیک کنید'
+		liveSrcHint: 'دوبار کلیک یا دکمه </> برای ویرایش سورس Markdown',
+		splitBlockHint: 'دوبار کلیک یا دکمه </> برای ویرایش سورس Markdown این بلوک',
+		editBlockSource: 'ویرایش سورس بلوک',
+		editBlockSourceHint: 'Ctrl+Enter ذخیره · Esc لغو',
+		saveBlockSource: 'ذخیره',
+		inlineToolbarAria: 'نوار ابزار قالب‌بندی'
 	});
 
 	function liveActive() {
@@ -253,11 +269,16 @@
 		liveReplaceRange(start, end, '');
 	}
 
-	function liveBlockFor(node) {
+	function previewBlockFor(node) {
 		var out = liveOut();
 		var el = node && node.nodeType === 1 ? node : (node && node.parentElement);
 		while (el && el.parentElement !== out) el = el.parentElement;
-		return el && el.hasAttribute('data-src-start') ? el : null;
+		return el && el.parentElement === out ? el : null;
+	}
+
+	function liveBlockFor(node) {
+		var block = previewBlockFor(node);
+		return block && block.hasAttribute('data-src-start') ? block : null;
 	}
 
 	function liveRange(block) {
@@ -379,40 +400,39 @@
 		else liveSetSource(v.slice(0, r.end) + '\n\n' + text + v.slice(r.end));
 	}
 
-	/* ── Source editing for blocks that cannot round-trip ── */
-	function liveEditSource(block) {
-		if (block.__liveEditing) return;
-		block.__liveEditing = true;
-		var r = liveRange(block);
-		var original = $editor.val().slice(r.start, r.end);
-		var ta = document.createElement('textarea');
-		ta.className = 'live-src-edit';
-		ta.setAttribute('dir', 'ltr');
-		ta.setAttribute('spellcheck', 'false');
-		ta.value = original;
-		var done = false;
+	/* ── Popup source editor (live non-WYSIWYG blocks + split-mode dblclick) ── */
+	var blockSrcDialogOpen = false;
 
-		function fit() {
-			ta.style.height = 'auto';
-			ta.style.height = (ta.scrollHeight + 2) + 'px';
-		}
+	function openBlockSourceEditor(start, end, onDone) {
+		var dlg = document.getElementById('block-src-dialog');
+		var ta = document.getElementById('block-src-textarea');
+		if (!dlg || !ta || blockSrcDialogOpen) return;
+		var original = $editor.val().slice(start, end);
+		blockSrcDialogOpen = true;
+		ta.value = original;
+		dlg.returnValue = '';
 
 		function close(commit) {
-			if (done) return;
-			done = true;
-			block.__liveEditing = false;
+			if (!blockSrcDialogOpen) return;
+			blockSrcDialogOpen = false;
+			dlg.close();
+			document.removeEventListener('keydown', onKey, true);
+			if (!commit) {
+				if (onDone) onDone(false);
+				return;
+			}
 			var next = ta.value.replace(/\s+$/, '');
-			ta.remove();
-			block.style.display = '';
-			if (!commit || next === original) return;
-			if (!next.trim()) liveRemoveRange(r.start, r.end);
-			else liveReplaceRange(r.start, r.end, next);
+			if (next === original) {
+				if (onDone) onDone(false);
+				return;
+			}
+			if (!next.trim()) liveRemoveRange(start, end);
+			else liveReplaceRange(start, end, next);
 			renderPreview();
+			if (onDone) onDone(true);
 		}
 
-		ta.addEventListener('input', fit);
-		ta.addEventListener('blur', function () { close(true); });
-		ta.addEventListener('keydown', function (e) {
+		function onKey(e) {
 			if (e.key === 'Escape') {
 				e.preventDefault();
 				close(false);
@@ -420,11 +440,215 @@
 				e.preventDefault();
 				close(true);
 			}
+		}
+
+		var form = dlg.querySelector('.block-src-dialog-form');
+		var cancelBtn = dlg.querySelector('.block-src-dialog-cancel');
+		var closeBtn = dlg.querySelector('.block-src-dialog-close');
+
+		function onSubmit(e) {
+			e.preventDefault();
+			close(true);
+		}
+
+		form.addEventListener('submit', onSubmit, { once: true });
+		cancelBtn.addEventListener('click', function () { close(false); }, { once: true });
+		closeBtn.addEventListener('click', function () { close(false); }, { once: true });
+		dlg.addEventListener('cancel', function (e) {
+			e.preventDefault();
+			close(false);
+		}, { once: true });
+		document.addEventListener('keydown', onKey, true);
+
+		if (typeof dlg.showModal === 'function') dlg.showModal();
+		else dlg.setAttribute('open', '');
+		requestAnimationFrame(function () {
+			ta.focus();
+			ta.setSelectionRange(0, 0);
 		});
-		block.style.display = 'none';
-		block.parentNode.insertBefore(ta, block);
-		fit();
-		ta.focus();
+	}
+
+	function liveEditSource(block) {
+		if (block.__liveEditing) return;
+		block.__liveEditing = true;
+		var r = liveRange(block);
+		openBlockSourceEditor(r.start, r.end, function () {
+			block.__liveEditing = false;
+		});
+	}
+
+	function splitEditBlock(block) {
+		var src = $editor.val();
+		var ranges = liveBlockRanges(src);
+		var kids = liveOut().children;
+		var idx = Array.prototype.indexOf.call(kids, block);
+		if (!ranges || idx < 0 || idx >= ranges.length || kids.length !== ranges.length) return;
+		openBlockSourceEditor(ranges[idx].start, ranges[idx].end);
+	}
+
+	/* ── Floating inline editor toolbar + block quick-edit chip ── */
+	var inlineToolbarEl = null;
+	var blockChipEl = null;
+	var hoveredBlock = null;
+
+	function ensureInlineToolbar() {
+		if (inlineToolbarEl) return inlineToolbarEl;
+		var bar = document.createElement('div');
+		bar.className = 'live-inline-toolbar hidden';
+		bar.setAttribute('role', 'toolbar');
+		bar.setAttribute('aria-label', t('inlineToolbarAria'));
+		bar.innerHTML =
+			'<button type="button" class="live-inline-btn" data-cmd="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="italic" title="Italic (Ctrl+I)"><em>I</em></button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="strikeThrough" title="Strikethrough">S̶</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="inline-code" title="Inline code">&lt;/&gt;</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="link" title="Link">🔗</button>' +
+			'<span class="live-inline-sep"></span>' +
+			'<button type="button" class="live-inline-btn" data-cmd="h2" title="Heading 2">H2</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="h3" title="Heading 3">H3</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="p" title="Paragraph">P</button>' +
+			'<span class="live-inline-sep"></span>' +
+			'<button type="button" class="live-inline-btn live-inline-btn--src" data-cmd="block-src" title="Edit Markdown source (Popup)">✎ MD</button>';
+
+		bar.addEventListener('mousedown', function (e) {
+			/* Keep text selection inside contenteditable block */
+			e.preventDefault();
+		});
+
+		bar.addEventListener('click', function (e) {
+			var btn = e.target.closest('[data-cmd]');
+			if (!btn) return;
+			var cmd = btn.getAttribute('data-cmd');
+			var sel = window.getSelection();
+			var block = sel && sel.anchorNode ? liveBlockFor(sel.anchorNode) : hoveredBlock;
+			if (!block) return;
+
+			if (cmd === 'block-src') {
+				hideInlineToolbar();
+				if (block.hasAttribute('data-src-start')) {
+					var r = liveRange(block);
+					openBlockSourceEditor(r.start, r.end);
+				} else {
+					splitEditBlock(block);
+				}
+				return;
+			}
+
+			if (!liveActive() || block.getAttribute('contenteditable') !== 'true') return;
+
+			if (cmd === 'bold' || cmd === 'italic' || cmd === 'strikeThrough') {
+				document.execCommand(cmd, false, null);
+				block.__liveDirty = true;
+				liveWriteBlock(block);
+			} else if (cmd === 'inline-code') {
+				if (sel && !sel.isCollapsed) {
+					var text = sel.toString();
+					document.execCommand('insertHTML', false, '<code>' + escapeHtml(text) + '</code>');
+					block.__liveDirty = true;
+					liveWriteBlock(block);
+				}
+			} else if (cmd === 'link') {
+				var url = window.prompt('URL:', 'https://');
+				if (url) {
+					document.execCommand('createLink', false, url);
+					block.__liveDirty = true;
+					liveWriteBlock(block);
+				}
+			} else if (cmd === 'h2' || cmd === 'h3' || cmd === 'p') {
+				var r2 = liveRange(block);
+				var md = liveToMarkdown(block).replace(/^#{1,6}\s+/, '');
+				var prefix = cmd === 'h2' ? '## ' : (cmd === 'h3' ? '### ' : '');
+				liveReplaceRange(r2.start, r2.end, prefix + md);
+				hideInlineToolbar();
+				renderPreview();
+				return;
+			}
+			updateInlineToolbarPosition();
+		});
+
+		document.body.appendChild(bar);
+		inlineToolbarEl = bar;
+		return bar;
+	}
+
+	function hideInlineToolbar() {
+		if (inlineToolbarEl) inlineToolbarEl.classList.add('hidden');
+	}
+
+	function updateInlineToolbarPosition() {
+		if (!liveActive() || liveLocked()) {
+			hideInlineToolbar();
+			return;
+		}
+		var sel = window.getSelection();
+		if (!sel || sel.isCollapsed || !sel.rangeCount) {
+			hideInlineToolbar();
+			return;
+		}
+		var block = liveBlockFor(sel.anchorNode);
+		if (!block || block.getAttribute('contenteditable') !== 'true') {
+			hideInlineToolbar();
+			return;
+		}
+		var range = sel.getRangeAt(0);
+		var rect = range.getBoundingClientRect();
+		if (!rect || (!rect.width && !rect.height)) {
+			hideInlineToolbar();
+			return;
+		}
+		var bar = ensureInlineToolbar();
+		bar.classList.remove('hidden');
+		var bw = bar.offsetWidth || 280;
+		var bh = bar.offsetHeight || 36;
+		var left = Math.max(8, Math.min(window.innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2));
+		var top = rect.top - bh - 8;
+		if (top < 8) top = rect.bottom + 8;
+		bar.style.left = Math.round(left) + 'px';
+		bar.style.top = Math.round(top) + 'px';
+	}
+
+	function ensureBlockChip() {
+		if (blockChipEl) return blockChipEl;
+		var btn = document.createElement('button');
+		btn.type = 'button';
+		btn.className = 'live-block-chip hidden';
+		btn.innerHTML = '✎ MD';
+		btn.setAttribute('title', t('liveSrcHint'));
+		btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+		btn.addEventListener('click', function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!hoveredBlock) return;
+			if (hoveredBlock.hasAttribute('data-src-start')) {
+				var r = liveRange(hoveredBlock);
+				openBlockSourceEditor(r.start, r.end);
+			} else {
+				splitEditBlock(hoveredBlock);
+			}
+		});
+		document.body.appendChild(btn);
+		blockChipEl = btn;
+		return btn;
+	}
+
+	function hideBlockChip() {
+		if (blockChipEl) blockChipEl.classList.add('hidden');
+	}
+
+	function positionBlockChip(block) {
+		if (!block || liveLocked() || blockSrcDialogOpen) {
+			hideBlockChip();
+			return;
+		}
+		hoveredBlock = block;
+		var chip = ensureBlockChip();
+		chip.setAttribute('title', liveActive() ? t('liveSrcHint') : t('splitBlockHint'));
+		chip.classList.remove('hidden');
+		var rect = block.getBoundingClientRect();
+		var top = Math.max(52, rect.top + 4);
+		var left = contentDir === 'rtl' ? Math.max(8, rect.left + 6) : Math.min(window.innerWidth - 64, rect.right - 56);
+		chip.style.top = Math.round(top) + 'px';
+		chip.style.left = Math.round(left) + 'px';
 	}
 
 	/* ── Events (delegated on #output once; the node itself is never replaced) ── */
@@ -486,12 +710,20 @@
 		});
 
 		out.addEventListener('dblclick', function (e) {
-			if (!liveActive() || liveLocked()) return;
-			var block = liveBlockFor(e.target);
-			if (block && block.classList.contains('live-src')) {
-				e.preventDefault();
-				liveEditSource(block);
+			if (liveLocked()) return;
+			if (e.target.closest('a,button,.code-copy,.mermaid-toolbar,.mermaid-viewport')) return;
+			if (liveActive()) {
+				var liveBlock = liveBlockFor(e.target);
+				if (liveBlock && liveBlock.classList.contains('live-src')) {
+					e.preventDefault();
+					liveEditSource(liveBlock);
+				}
+				return;
 			}
+			var block = previewBlockFor(e.target);
+			if (!block) return;
+			e.preventDefault();
+			splitEditBlock(block);
 		});
 
 		/* Paste with nothing focused (the "paste a whole .md" case) → append as blocks. */
@@ -511,6 +743,50 @@
 			$editor.val(LIVE_PLACEHOLDER + '\n');
 			liveFocusStart = 0;
 			renderPreview();
+		});
+
+		document.addEventListener('selectionchange', function () {
+			if (!liveActive()) return;
+			updateInlineToolbarPosition();
+		});
+
+		out.addEventListener('mousemove', function (e) {
+			if (liveLocked()) return;
+			var block = previewBlockFor(e.target);
+			if (!block) {
+				hideBlockChip();
+				return;
+			}
+			if (block !== hoveredBlock || (blockChipEl && blockChipEl.classList.contains('hidden'))) {
+				positionBlockChip(block);
+			}
+		});
+
+		out.addEventListener('mouseleave', function (e) {
+			if (e.relatedTarget && blockChipEl && (e.relatedTarget === blockChipEl || blockChipEl.contains(e.relatedTarget))) return;
+			hideBlockChip();
+		});
+
+		out.addEventListener('scroll', function () {
+			hideInlineToolbar();
+			hideBlockChip();
+		}, { passive: true });
+	}
+
+	function copyActiveDocument() {
+		var text = $editor.val();
+		if (!text) return;
+		var btn = document.getElementById('btn-copy-doc');
+		copyText(text).then(function () {
+			if (!btn) return;
+			btn.classList.add('is-copied');
+			btn.setAttribute('title', t('copyDocDone'));
+			setTimeout(function () {
+				btn.classList.remove('is-copied');
+				btn.setAttribute('title', t('copyDocHint'));
+			}, 1400);
+		}).catch(function () {
+			if (btn) window.alert(t('copyDocFail'));
 		});
 	}
 
@@ -538,8 +814,8 @@
 		document.body.classList.toggle('live-mode', mode === 'live');
 		var sel = document.getElementById('set-viewmode');
 		if (sel) sel.value = mode;
+		liveBindEvents();
 		if (mode === 'live') {
-			liveBindEvents();
 			liveEnsureTurndown().then(liveAfterPreview, function () {});
 		}
 		if (!skipRender && api && api.renderPreview) api.renderPreview();

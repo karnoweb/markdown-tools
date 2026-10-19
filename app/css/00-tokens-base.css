@@ -916,6 +916,43 @@ html[data-font-size="xl"] {
   --rtlmd-paragraph-gap: 1.5em;
 }
 
+/* Reading font (default = vazirmatn = :root --rtlmd-font). Set via data-font-family on <html>. */
+html[data-font-family="sahel"] {
+  --rtlmd-font: 'Sahel', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="shabnam"] {
+  --rtlmd-font: 'Shabnam', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="samim"] {
+  --rtlmd-font: 'Samim', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="estedad"] {
+  --rtlmd-font: 'Estedad', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="parastoo"] {
+  --rtlmd-font: 'Parastoo', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="tanha"] {
+  --rtlmd-font: 'Tanha', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="gandom"] {
+  --rtlmd-font: 'Gandom', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="tahoma"] {
+  --rtlmd-font: Tahoma, 'Segoe UI', 'Arial Unicode MS', sans-serif;
+}
+
+html[data-font-family="system"] {
+  --rtlmd-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
 *,
 *::before,
 *::after {

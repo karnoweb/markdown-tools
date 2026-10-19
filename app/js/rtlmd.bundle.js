@@ -18,6 +18,8 @@
 	var DIR_KEY = 'rtlmd-dir';
 	var FONT_KEY = 'rtlmd-font-size';
 	var FONT_SIZES = ['xs', 'sm', 'md', 'lg', 'xl'];
+	var FONT_FAMILY_KEY = 'rtlmd-font-family';
+	var FONT_FAMILIES = ['vazirmatn', 'sahel', 'shabnam', 'samim', 'estedad', 'parastoo', 'tanha', 'gandom', 'tahoma', 'system'];
 	var FULLVIEW_KEY = 'rtlmd-fullview';
 	var SCROLL_SYNC_KEY = 'rtlmd-scroll-sync';
 	var PREFS_VER_KEY = 'rtlmd-prefs-ver';
@@ -349,7 +351,7 @@
 				startOnLoad: false,
 				theme: getMermaidTheme(),
 				securityLevel: 'loose',
-				fontFamily: 'Vazirmatn, Tahoma, sans-serif'
+				fontFamily: typeof mermaidFontFamily === 'function' ? mermaidFontFamily() : 'Vazirmatn, Tahoma, sans-serif'
 			});
 			mermaid.run({ nodes: nodes }).then(function () {
 				enhanceMermaidDiagrams();
@@ -360,12 +362,28 @@
 		} catch (e) { /* ponytail: mermaid unavailable */ }
 	}
 
+	function normalizeMermaidSvgDimensions(svg) {
+		var vb = svg.getAttribute('viewBox');
+		if (!vb) return;
+		var parts = vb.trim().split(/[\s,]+/);
+		if (parts.length !== 4) return;
+		var w = parseFloat(parts[2]);
+		var h = parseFloat(parts[3]);
+		if (w > 0 && h > 0) {
+			svg.setAttribute('width', String(Math.ceil(w)));
+			svg.setAttribute('height', String(Math.ceil(h)));
+			svg.style.maxWidth = '100%';
+			svg.style.height = 'auto';
+		}
+	}
+
 	function enhanceMermaidDiagrams() {
 		document.querySelectorAll('#output .mermaid-wrap').forEach(function (wrap) {
 			if (wrap.dataset.mermaidEnhanced === '1') return;
 			var svg = wrap.querySelector('svg');
 			if (!svg) return;
 			wrap.dataset.mermaidEnhanced = '1';
+			normalizeMermaidSvgDimensions(svg);
 
 			var toolbar = document.createElement('div');
 			toolbar.className = 'mermaid-toolbar';
@@ -376,21 +394,22 @@
 				'<button type="button" class="mermaid-zoom-btn mermaid-zoom-btn--label" data-action="reset" title="Reset zoom" aria-label="Reset zoom">100%</button>' +
 				'<button type="button" class="mermaid-zoom-btn" data-action="in" title="Zoom in" aria-label="Zoom in">+</button>' +
 				'<button type="button" class="mermaid-zoom-btn" data-action="fit" title="Fit width" aria-label="Fit width">Fit</button>' +
-				'<button type="button" class="mermaid-zoom-btn" data-action="full" title="Fullscreen" aria-label="Fullscreen">⛶</button>';
+				'<button type="button" class="mermaid-zoom-btn" data-action="full" title="Lightbox view (click or double-click diagram)" aria-label="Open lightbox">⛶</button>';
 
 			var viewport = document.createElement('div');
 			viewport.className = 'mermaid-viewport';
 			var stage = document.createElement('div');
 			stage.className = 'mermaid-stage';
 
-			wrap.insertBefore(toolbar, svg);
-			wrap.insertBefore(viewport, svg);
-			stage.appendChild(svg);
+			var pre = wrap.querySelector('pre.mermaid') || svg;
+			wrap.insertBefore(toolbar, pre);
+			wrap.insertBefore(viewport, pre);
+			stage.appendChild(pre);
 			viewport.appendChild(stage);
 
 			var scale = 1;
 			var minScale = 0.2;
-			var maxScale = 5;
+			var maxScale = 6;
 			var pinchStart = 0;
 
 			function labelBtn() {
@@ -412,15 +431,32 @@
 				if (baseWidth > 0) applyScale(Math.min(1, vw / baseWidth), 'top center');
 			}
 
+			function openDiagramLightbox() {
+				var cloneSvg = svg.cloneNode(true);
+				var vb = cloneSvg.getAttribute('viewBox');
+				if (vb) {
+					var p = vb.trim().split(/[\s,]+/);
+					if (p.length === 4 && parseFloat(p[2]) > 0 && parseFloat(p[3]) > 0) {
+						cloneSvg.setAttribute('width', String(Math.ceil(parseFloat(p[2]))));
+						cloneSvg.setAttribute('height', String(Math.ceil(parseFloat(p[3]))));
+					}
+				}
+				cloneSvg.style.maxWidth = 'none';
+				cloneSvg.style.width = '';
+				cloneSvg.style.height = '';
+				openMediaLightbox(cloneSvg, 'Diagram');
+			}
+
 			toolbar.addEventListener('click', function (e) {
 				var btn = e.target.closest('[data-action]');
 				if (!btn) return;
+				e.stopPropagation();
 				var action = btn.getAttribute('data-action');
 				if (action === 'in') applyScale(scale * 1.2, 'top center');
 				if (action === 'out') applyScale(scale / 1.2, 'top center');
 				if (action === 'reset') applyScale(1, 'top center');
 				if (action === 'fit') fitWidth();
-				if (action === 'full') openMermaidFullscreen(wrap, stage, toolbar, applyScale, fitWidth, function () { return scale; });
+				if (action === 'full') openDiagramLightbox();
 			});
 
 			viewport.addEventListener('wheel', function (e) {
@@ -445,9 +481,42 @@
 				pinchStart = 0;
 			});
 
+			viewport.addEventListener('click', function (e) {
+				if (e.target.closest('.mermaid-toolbar, a, button')) return;
+				openDiagramLightbox();
+			});
+			viewport.addEventListener('dblclick', function (e) {
+				if (e.target.closest('.mermaid-toolbar')) return;
+				e.stopPropagation();
+				openDiagramLightbox();
+			});
+			viewport.setAttribute('title', 'Click to zoom in lightbox');
+			viewport.style.cursor = 'zoom-in';
+
 			if (window.matchMedia('(max-width: 768px)').matches) {
 				requestAnimationFrame(fitWidth);
 			}
+		});
+	}
+
+	function enhancePreviewImages() {
+		document.querySelectorAll('#output img').forEach(function (img) {
+			if (img.dataset.lightboxReady === '1') return;
+			img.dataset.lightboxReady = '1';
+			img.classList.add('preview-zoomable-img');
+			if (!img.getAttribute('title')) {
+				img.setAttribute('title', 'Click to zoom in lightbox');
+			}
+			img.addEventListener('click', function (e) {
+				if (e.target.closest('a')) return;
+				e.preventDefault();
+				e.stopPropagation();
+				var clone = document.createElement('img');
+				clone.src = img.currentSrc || img.src;
+				clone.alt = img.alt || '';
+				clone.draggable = false;
+				openMediaLightbox(clone, img.alt || 'Image');
+			});
 		});
 	}
 
@@ -457,85 +526,205 @@
 		return Math.hypot(dx, dy);
 	}
 
-	function openMermaidFullscreen(wrap, stage, toolbar, applyScale, fitWidth, getScale) {
+	function openMediaLightbox(mediaEl, captionText) {
+		var existing = document.querySelector('.media-lightbox');
+		if (existing) existing.remove();
+
 		var overlay = document.createElement('div');
-		overlay.className = 'mermaid-fullscreen';
+		overlay.className = 'media-lightbox mermaid-fullscreen';
 		overlay.setAttribute('role', 'dialog');
 		overlay.setAttribute('aria-modal', 'true');
-		overlay.setAttribute('aria-label', 'Diagram preview');
+		overlay.setAttribute('aria-label', captionText || 'Preview');
 
-		var panel = document.createElement('div');
-		panel.className = 'mermaid-fullscreen-panel';
+		var bar = document.createElement('div');
+		bar.className = 'media-lightbox-bar';
+		bar.innerHTML =
+			'<span class="media-lightbox-title">' + escapeHtml(captionText || '') + '</span>' +
+			'<div class="media-lightbox-controls" role="toolbar" aria-label="Zoom controls">' +
+				'<button type="button" class="mermaid-zoom-btn" data-lb="out" title="Zoom out (−)" aria-label="Zoom out">−</button>' +
+				'<button type="button" class="mermaid-zoom-btn mermaid-zoom-btn--label" data-lb="reset" title="Reset 100% (0)" aria-label="Reset zoom">100%</button>' +
+				'<button type="button" class="mermaid-zoom-btn" data-lb="in" title="Zoom in (+)" aria-label="Zoom in">+</button>' +
+				'<button type="button" class="mermaid-zoom-btn" data-lb="fit" title="Fit to screen" aria-label="Fit to screen">Fit</button>' +
+				'<button type="button" class="mermaid-zoom-btn media-lightbox-close" data-lb="close" title="Close (Esc)" aria-label="Close">✕</button>' +
+			'</div>';
 
-		var head = document.createElement('div');
-		head.className = 'mermaid-fullscreen-head';
-		head.innerHTML = '<span>Diagram</span>';
+		var canvas = document.createElement('div');
+		canvas.className = 'media-lightbox-canvas';
 
-		var closeBtn = document.createElement('button');
-		closeBtn.type = 'button';
-		closeBtn.className = 'mermaid-zoom-btn';
-		closeBtn.textContent = '✕';
-		closeBtn.setAttribute('aria-label', 'Close');
-		closeBtn.addEventListener('click', close);
-		head.appendChild(closeBtn);
+		var stage = document.createElement('div');
+		stage.className = 'media-lightbox-stage';
+		stage.appendChild(mediaEl);
+		canvas.appendChild(stage);
 
-		var cloneToolbar = toolbar.cloneNode(true);
-		var cloneViewport = document.createElement('div');
-		cloneViewport.className = 'mermaid-viewport mermaid-viewport--full';
-		var cloneStage = stage.cloneNode(true);
-		cloneStage.style.transform = stage.style.transform || 'scale(1)';
-		cloneViewport.appendChild(cloneStage);
-
-		var fsScale = getScale();
-		function fsApply(next) {
-			fsScale = Math.min(5, Math.max(0.2, next));
-			cloneStage.style.transform = 'scale(' + fsScale + ')';
-			var reset = cloneToolbar.querySelector('[data-action="reset"]');
-			if (reset) reset.textContent = Math.round(fsScale * 100) + '%';
-		}
-
-		cloneToolbar.addEventListener('click', function (e) {
-			var btn = e.target.closest('[data-action]');
-			if (!btn) return;
-			var action = btn.getAttribute('data-action');
-			if (action === 'in') fsApply(fsScale * 1.2);
-			if (action === 'out') fsApply(fsScale / 1.2);
-			if (action === 'reset') fsApply(1);
-			if (action === 'fit') {
-				var svg = cloneStage.querySelector('svg');
-				if (!svg) return;
-				var vw = Math.max(cloneViewport.clientWidth - 8, 1);
-				var base = svg.getBoundingClientRect().width / fsScale;
-				if (base > 0) fsApply(Math.min(1, vw / base));
-			}
-			if (action === 'full') close();
-		});
-
-		panel.appendChild(head);
-		panel.appendChild(cloneToolbar);
-		panel.appendChild(cloneViewport);
-		overlay.appendChild(panel);
+		overlay.appendChild(bar);
+		overlay.appendChild(canvas);
 		document.body.appendChild(overlay);
 		document.body.classList.add('mermaid-fullscreen-open');
+
+		var scale = 1;
+		var tx = 0;
+		var ty = 0;
+		var minScale = 0.15;
+		var maxScale = 8;
+		var dragging = false;
+		var dragStartX = 0;
+		var dragStartY = 0;
+		var startTx = 0;
+		var startTy = 0;
+		var pinchStart = 0;
+
+		function renderTransform() {
+			stage.style.transform = 'translate3d(' + Math.round(tx) + 'px,' + Math.round(ty) + 'px,0) scale(' + scale + ')';
+			var lbl = bar.querySelector('[data-lb="reset"]');
+			if (lbl) lbl.textContent = Math.round(scale * 100) + '%';
+		}
+
+		function zoomAt(nextScale, clientX, clientY) {
+			nextScale = Math.min(maxScale, Math.max(minScale, nextScale));
+			if (typeof clientX === 'number' && typeof clientY === 'number') {
+				var rect = canvas.getBoundingClientRect();
+				var cx = clientX - (rect.left + rect.width / 2);
+				var cy = clientY - (rect.top + rect.height / 2);
+				var ratio = nextScale / scale;
+				tx = cx - (cx - tx) * ratio;
+				ty = cy - (cy - ty) * ratio;
+			}
+			scale = nextScale;
+			renderTransform();
+		}
+
+		function resetView() {
+			scale = 1;
+			tx = 0;
+			ty = 0;
+			renderTransform();
+		}
+
+		function fitToScreen() {
+			scale = 1;
+			tx = 0;
+			ty = 0;
+			stage.style.transform = 'scale(1)';
+			var cRect = canvas.getBoundingClientRect();
+			var mRect = mediaEl.getBoundingClientRect();
+			var mw = mRect.width || 1;
+			var mh = mRect.height || 1;
+			var availW = Math.max(cRect.width - 48, 100);
+			var availH = Math.max(cRect.height - 48, 100);
+			scale = Math.min(maxScale, Math.max(minScale, Math.min(availW / mw, availH / mh, 2.2)));
+			tx = 0;
+			ty = 0;
+			renderTransform();
+		}
+
+		bar.addEventListener('click', function (e) {
+			var btn = e.target.closest('[data-lb]');
+			if (!btn) return;
+			var act = btn.getAttribute('data-lb');
+			if (act === 'in') zoomAt(scale * 1.25);
+			else if (act === 'out') zoomAt(scale / 1.25);
+			else if (act === 'reset') resetView();
+			else if (act === 'fit') fitToScreen();
+			else if (act === 'close') close();
+		});
+
+		canvas.addEventListener('wheel', function (e) {
+			e.preventDefault();
+			var factor = e.deltaY < 0 ? 1.15 : (1 / 1.15);
+			zoomAt(scale * factor, e.clientX, e.clientY);
+		}, { passive: false });
+
+		canvas.addEventListener('mousedown', function (e) {
+			if (e.button !== 0) return;
+			dragging = true;
+			dragStartX = e.clientX;
+			dragStartY = e.clientY;
+			startTx = tx;
+			startTy = ty;
+			canvas.classList.add('is-dragging');
+		});
+
+		function onMouseMove(e) {
+			if (!dragging) return;
+			tx = startTx + (e.clientX - dragStartX);
+			ty = startTy + (e.clientY - dragStartY);
+			renderTransform();
+		}
+
+		function onMouseUp() {
+			if (!dragging) return;
+			dragging = false;
+			canvas.classList.remove('is-dragging');
+		}
+
+		canvas.addEventListener('dblclick', function (e) {
+			e.preventDefault();
+			if (Math.abs(scale - 1) > 0.15) fitToScreen();
+			else zoomAt(2, e.clientX, e.clientY);
+		});
+
+		canvas.addEventListener('touchstart', function (e) {
+			if (e.touches.length === 2) {
+				pinchStart = pinchDistance(e.touches);
+			} else if (e.touches.length === 1) {
+				dragging = true;
+				dragStartX = e.touches[0].clientX;
+				dragStartY = e.touches[0].clientY;
+				startTx = tx;
+				startTy = ty;
+			}
+		}, { passive: true });
+
+		canvas.addEventListener('touchmove', function (e) {
+			if (e.touches.length === 2 && pinchStart) {
+				e.preventDefault();
+				var dist = pinchDistance(e.touches);
+				zoomAt(scale * (dist / pinchStart));
+				pinchStart = dist;
+			} else if (e.touches.length === 1 && dragging) {
+				e.preventDefault();
+				tx = startTx + (e.touches[0].clientX - dragStartX);
+				ty = startTy + (e.touches[0].clientY - dragStartY);
+				renderTransform();
+			}
+		}, { passive: false });
+
+		canvas.addEventListener('touchend', function () {
+			dragging = false;
+			pinchStart = 0;
+		});
+
+		canvas.addEventListener('click', function (e) {
+			if (e.target === canvas && Math.hypot(tx - startTx, ty - startTy) < 4) {
+				close();
+			}
+		});
+
+		function onKey(e) {
+			if (e.key === 'Escape') close();
+			else if (e.key === '+' || e.key === '=') zoomAt(scale * 1.25);
+			else if (e.key === '-') zoomAt(scale / 1.25);
+			else if (e.key === '0') resetView();
+		}
 
 		function close() {
 			overlay.remove();
 			document.body.classList.remove('mermaid-fullscreen-open');
 			document.removeEventListener('keydown', onKey);
-		}
-
-		function onKey(e) {
-			if (e.key === 'Escape') close();
+			window.removeEventListener('mousemove', onMouseMove);
+			window.removeEventListener('mouseup', onMouseUp);
 		}
 
 		document.addEventListener('keydown', onKey);
-		overlay.addEventListener('click', function (e) {
-			if (e.target === overlay) close();
-		});
+		window.addEventListener('mousemove', onMouseMove);
+		window.addEventListener('mouseup', onMouseUp);
 
 		requestAnimationFrame(function () {
-			var fitBtn = cloneToolbar.querySelector('[data-action="fit"]');
-			if (fitBtn) fitBtn.click();
+			if (mediaEl.tagName === 'IMG' && !mediaEl.complete) {
+				mediaEl.addEventListener('load', fitToScreen, { once: true });
+			} else {
+				fitToScreen();
+			}
 		});
 	}
 
@@ -605,6 +794,40 @@
 
 	function initFontSize() {
 		applyFontSize(storageGet(FONT_KEY, 'md'));
+	}
+
+	function normalizeFontFamily(id) {
+		return FONT_FAMILIES.indexOf(id) !== -1 ? id : 'vazirmatn';
+	}
+
+	function applyFontFamily(id, skipRender) {
+		id = normalizeFontFamily(id);
+		document.documentElement.setAttribute('data-font-family', id);
+		var sel = document.getElementById('font-family-select');
+		if (sel) sel.value = id;
+		storageSet(FONT_FAMILY_KEY, id);
+		if (!skipRender && typeof renderPreview === 'function') renderPreview();
+	}
+
+	function initFontFamily() {
+		applyFontFamily(storageGet(FONT_FAMILY_KEY, 'vazirmatn'), true);
+	}
+
+	function mermaidFontFamily() {
+		var id = normalizeFontFamily(document.documentElement.getAttribute('data-font-family') || 'vazirmatn');
+		var map = {
+			vazirmatn: 'Vazirmatn, Tahoma, sans-serif',
+			sahel: 'Sahel, Vazirmatn, Tahoma, sans-serif',
+			shabnam: 'Shabnam, Vazirmatn, Tahoma, sans-serif',
+			samim: 'Samim, Vazirmatn, Tahoma, sans-serif',
+			estedad: 'Estedad, Vazirmatn, Tahoma, sans-serif',
+			parastoo: 'Parastoo, Vazirmatn, Tahoma, sans-serif',
+			tanha: 'Tanha, Vazirmatn, Tahoma, sans-serif',
+			gandom: 'Gandom, Vazirmatn, Tahoma, sans-serif',
+			tahoma: 'Tahoma, Segoe UI, sans-serif',
+			system: 'system-ui, Segoe UI, sans-serif'
+		};
+		return map[id] || map.vazirmatn;
 	}
 
 	function setFullview(on) {
@@ -1909,6 +2132,7 @@
 		highlightCode();
 		attachCodeCopyButtons();
 		renderMermaid();
+		enhancePreviewImages();
 		refreshScrollMaps();
 		if (typeof window.rtlmdAfterPreview === 'function') {
 			window.rtlmdAfterPreview();
@@ -2261,6 +2485,11 @@
 		nodes = root.querySelectorAll('script,style,button,.code-copy,.code-lang,.mermaid-toolbar,.preview-toc,.toc-toggle-btn');
 		for (i = 0; i < nodes.length; i++) {
 			if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
+		}
+		nodes = root.querySelectorAll('.preview-zoomable-img');
+		for (i = 0; i < nodes.length; i++) {
+			nodes[i].classList.remove('preview-zoomable-img');
+			nodes[i].removeAttribute('data-lightbox-ready');
 		}
 		/* mermaid: drop zoom toolbar/viewport wrappers, keep the rendered svg */
 		nodes = root.querySelectorAll('.mermaid-wrap');
@@ -2774,6 +3003,7 @@
 		initTheme();
 		initDirection();
 		initFontSize();
+		initFontFamily();
 		initFullview();
 		initScrollSync();
 		initSidebar();
@@ -2794,6 +3024,10 @@
 
 		$('#font-size-select').on('change', function () {
 			applyFontSize(this.value);
+		});
+
+		$('#font-family-select').on('change', function () {
+			applyFontFamily(this.value);
 		});
 
 		$('#fullview-toggle').on('change', function () {
@@ -3528,20 +3762,36 @@
 	Object.assign(STR.en, {
 		clearDoc: 'Clear', clearHint: 'Clear the whole document (a snapshot is saved first)',
 		clearConfirm: 'Clear the entire document? A snapshot will be saved so you can restore it.',
+		copyDocHint: 'Copy entire document as Markdown',
+		copyDocDone: 'Copied',
+		copyDocFail: 'Copy failed',
 		viewMode: 'View mode', viewModeSplit: 'Split (editor + preview)',
 		viewModeLive: 'Live (edit the preview directly)',
 		liveUnmapped: 'Live editing unavailable for this document (unsupported structure). Switch to Split mode.',
 		livePasteHint: 'Paste Markdown here (Ctrl+V) or click to start typing',
-		liveSrcHint: 'Double-click to edit source'
+		liveSrcHint: 'Double-click or click </> to edit Markdown source',
+		splitBlockHint: 'Double-click or click </> to edit this block’s Markdown source',
+		editBlockSource: 'Edit block source',
+		editBlockSourceHint: 'Ctrl+Enter to save · Esc to cancel',
+		saveBlockSource: 'Save',
+		inlineToolbarAria: 'Formatting toolbar'
 	});
 	Object.assign(STR.fa, {
 		clearDoc: 'پاک‌کردن', clearHint: 'پاک‌کردن کل سند (قبلش یک نسخه ذخیره می‌شود)',
 		clearConfirm: 'کل سند پاک شود؟ قبلش یک نسخه ذخیره می‌شود تا بتوانید بازیابی کنید.',
+		copyDocHint: 'کپی کل سند به‌صورت Markdown',
+		copyDocDone: 'کپی شد',
+		copyDocFail: 'کپی ناموفق',
 		viewMode: 'حالت نمایش', viewModeSplit: 'دوتایی (ویرایشگر + پیش‌نمایش)',
 		viewModeLive: 'زنده (ویرایش مستقیم پیش‌نمایش)',
 		liveUnmapped: 'ویرایش زنده برای این سند ممکن نیست (ساختار پشتیبانی‌نشده). به حالت دوتایی بروید.',
 		livePasteHint: 'Markdown را اینجا پیست کنید (Ctrl+V) یا شروع به نوشتن کنید',
-		liveSrcHint: 'برای ویرایش سورس دوبار کلیک کنید'
+		liveSrcHint: 'دوبار کلیک یا دکمه </> برای ویرایش سورس Markdown',
+		splitBlockHint: 'دوبار کلیک یا دکمه </> برای ویرایش سورس Markdown این بلوک',
+		editBlockSource: 'ویرایش سورس بلوک',
+		editBlockSourceHint: 'Ctrl+Enter ذخیره · Esc لغو',
+		saveBlockSource: 'ذخیره',
+		inlineToolbarAria: 'نوار ابزار قالب‌بندی'
 	});
 
 	function liveActive() {
@@ -3757,11 +4007,16 @@
 		liveReplaceRange(start, end, '');
 	}
 
-	function liveBlockFor(node) {
+	function previewBlockFor(node) {
 		var out = liveOut();
 		var el = node && node.nodeType === 1 ? node : (node && node.parentElement);
 		while (el && el.parentElement !== out) el = el.parentElement;
-		return el && el.hasAttribute('data-src-start') ? el : null;
+		return el && el.parentElement === out ? el : null;
+	}
+
+	function liveBlockFor(node) {
+		var block = previewBlockFor(node);
+		return block && block.hasAttribute('data-src-start') ? block : null;
 	}
 
 	function liveRange(block) {
@@ -3883,40 +4138,39 @@
 		else liveSetSource(v.slice(0, r.end) + '\n\n' + text + v.slice(r.end));
 	}
 
-	/* ── Source editing for blocks that cannot round-trip ── */
-	function liveEditSource(block) {
-		if (block.__liveEditing) return;
-		block.__liveEditing = true;
-		var r = liveRange(block);
-		var original = $editor.val().slice(r.start, r.end);
-		var ta = document.createElement('textarea');
-		ta.className = 'live-src-edit';
-		ta.setAttribute('dir', 'ltr');
-		ta.setAttribute('spellcheck', 'false');
-		ta.value = original;
-		var done = false;
+	/* ── Popup source editor (live non-WYSIWYG blocks + split-mode dblclick) ── */
+	var blockSrcDialogOpen = false;
 
-		function fit() {
-			ta.style.height = 'auto';
-			ta.style.height = (ta.scrollHeight + 2) + 'px';
-		}
+	function openBlockSourceEditor(start, end, onDone) {
+		var dlg = document.getElementById('block-src-dialog');
+		var ta = document.getElementById('block-src-textarea');
+		if (!dlg || !ta || blockSrcDialogOpen) return;
+		var original = $editor.val().slice(start, end);
+		blockSrcDialogOpen = true;
+		ta.value = original;
+		dlg.returnValue = '';
 
 		function close(commit) {
-			if (done) return;
-			done = true;
-			block.__liveEditing = false;
+			if (!blockSrcDialogOpen) return;
+			blockSrcDialogOpen = false;
+			dlg.close();
+			document.removeEventListener('keydown', onKey, true);
+			if (!commit) {
+				if (onDone) onDone(false);
+				return;
+			}
 			var next = ta.value.replace(/\s+$/, '');
-			ta.remove();
-			block.style.display = '';
-			if (!commit || next === original) return;
-			if (!next.trim()) liveRemoveRange(r.start, r.end);
-			else liveReplaceRange(r.start, r.end, next);
+			if (next === original) {
+				if (onDone) onDone(false);
+				return;
+			}
+			if (!next.trim()) liveRemoveRange(start, end);
+			else liveReplaceRange(start, end, next);
 			renderPreview();
+			if (onDone) onDone(true);
 		}
 
-		ta.addEventListener('input', fit);
-		ta.addEventListener('blur', function () { close(true); });
-		ta.addEventListener('keydown', function (e) {
+		function onKey(e) {
 			if (e.key === 'Escape') {
 				e.preventDefault();
 				close(false);
@@ -3924,11 +4178,215 @@
 				e.preventDefault();
 				close(true);
 			}
+		}
+
+		var form = dlg.querySelector('.block-src-dialog-form');
+		var cancelBtn = dlg.querySelector('.block-src-dialog-cancel');
+		var closeBtn = dlg.querySelector('.block-src-dialog-close');
+
+		function onSubmit(e) {
+			e.preventDefault();
+			close(true);
+		}
+
+		form.addEventListener('submit', onSubmit, { once: true });
+		cancelBtn.addEventListener('click', function () { close(false); }, { once: true });
+		closeBtn.addEventListener('click', function () { close(false); }, { once: true });
+		dlg.addEventListener('cancel', function (e) {
+			e.preventDefault();
+			close(false);
+		}, { once: true });
+		document.addEventListener('keydown', onKey, true);
+
+		if (typeof dlg.showModal === 'function') dlg.showModal();
+		else dlg.setAttribute('open', '');
+		requestAnimationFrame(function () {
+			ta.focus();
+			ta.setSelectionRange(0, 0);
 		});
-		block.style.display = 'none';
-		block.parentNode.insertBefore(ta, block);
-		fit();
-		ta.focus();
+	}
+
+	function liveEditSource(block) {
+		if (block.__liveEditing) return;
+		block.__liveEditing = true;
+		var r = liveRange(block);
+		openBlockSourceEditor(r.start, r.end, function () {
+			block.__liveEditing = false;
+		});
+	}
+
+	function splitEditBlock(block) {
+		var src = $editor.val();
+		var ranges = liveBlockRanges(src);
+		var kids = liveOut().children;
+		var idx = Array.prototype.indexOf.call(kids, block);
+		if (!ranges || idx < 0 || idx >= ranges.length || kids.length !== ranges.length) return;
+		openBlockSourceEditor(ranges[idx].start, ranges[idx].end);
+	}
+
+	/* ── Floating inline editor toolbar + block quick-edit chip ── */
+	var inlineToolbarEl = null;
+	var blockChipEl = null;
+	var hoveredBlock = null;
+
+	function ensureInlineToolbar() {
+		if (inlineToolbarEl) return inlineToolbarEl;
+		var bar = document.createElement('div');
+		bar.className = 'live-inline-toolbar hidden';
+		bar.setAttribute('role', 'toolbar');
+		bar.setAttribute('aria-label', t('inlineToolbarAria'));
+		bar.innerHTML =
+			'<button type="button" class="live-inline-btn" data-cmd="bold" title="Bold (Ctrl+B)"><strong>B</strong></button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="italic" title="Italic (Ctrl+I)"><em>I</em></button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="strikeThrough" title="Strikethrough">S̶</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="inline-code" title="Inline code">&lt;/&gt;</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="link" title="Link">🔗</button>' +
+			'<span class="live-inline-sep"></span>' +
+			'<button type="button" class="live-inline-btn" data-cmd="h2" title="Heading 2">H2</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="h3" title="Heading 3">H3</button>' +
+			'<button type="button" class="live-inline-btn" data-cmd="p" title="Paragraph">P</button>' +
+			'<span class="live-inline-sep"></span>' +
+			'<button type="button" class="live-inline-btn live-inline-btn--src" data-cmd="block-src" title="Edit Markdown source (Popup)">✎ MD</button>';
+
+		bar.addEventListener('mousedown', function (e) {
+			/* Keep text selection inside contenteditable block */
+			e.preventDefault();
+		});
+
+		bar.addEventListener('click', function (e) {
+			var btn = e.target.closest('[data-cmd]');
+			if (!btn) return;
+			var cmd = btn.getAttribute('data-cmd');
+			var sel = window.getSelection();
+			var block = sel && sel.anchorNode ? liveBlockFor(sel.anchorNode) : hoveredBlock;
+			if (!block) return;
+
+			if (cmd === 'block-src') {
+				hideInlineToolbar();
+				if (block.hasAttribute('data-src-start')) {
+					var r = liveRange(block);
+					openBlockSourceEditor(r.start, r.end);
+				} else {
+					splitEditBlock(block);
+				}
+				return;
+			}
+
+			if (!liveActive() || block.getAttribute('contenteditable') !== 'true') return;
+
+			if (cmd === 'bold' || cmd === 'italic' || cmd === 'strikeThrough') {
+				document.execCommand(cmd, false, null);
+				block.__liveDirty = true;
+				liveWriteBlock(block);
+			} else if (cmd === 'inline-code') {
+				if (sel && !sel.isCollapsed) {
+					var text = sel.toString();
+					document.execCommand('insertHTML', false, '<code>' + escapeHtml(text) + '</code>');
+					block.__liveDirty = true;
+					liveWriteBlock(block);
+				}
+			} else if (cmd === 'link') {
+				var url = window.prompt('URL:', 'https://');
+				if (url) {
+					document.execCommand('createLink', false, url);
+					block.__liveDirty = true;
+					liveWriteBlock(block);
+				}
+			} else if (cmd === 'h2' || cmd === 'h3' || cmd === 'p') {
+				var r2 = liveRange(block);
+				var md = liveToMarkdown(block).replace(/^#{1,6}\s+/, '');
+				var prefix = cmd === 'h2' ? '## ' : (cmd === 'h3' ? '### ' : '');
+				liveReplaceRange(r2.start, r2.end, prefix + md);
+				hideInlineToolbar();
+				renderPreview();
+				return;
+			}
+			updateInlineToolbarPosition();
+		});
+
+		document.body.appendChild(bar);
+		inlineToolbarEl = bar;
+		return bar;
+	}
+
+	function hideInlineToolbar() {
+		if (inlineToolbarEl) inlineToolbarEl.classList.add('hidden');
+	}
+
+	function updateInlineToolbarPosition() {
+		if (!liveActive() || liveLocked()) {
+			hideInlineToolbar();
+			return;
+		}
+		var sel = window.getSelection();
+		if (!sel || sel.isCollapsed || !sel.rangeCount) {
+			hideInlineToolbar();
+			return;
+		}
+		var block = liveBlockFor(sel.anchorNode);
+		if (!block || block.getAttribute('contenteditable') !== 'true') {
+			hideInlineToolbar();
+			return;
+		}
+		var range = sel.getRangeAt(0);
+		var rect = range.getBoundingClientRect();
+		if (!rect || (!rect.width && !rect.height)) {
+			hideInlineToolbar();
+			return;
+		}
+		var bar = ensureInlineToolbar();
+		bar.classList.remove('hidden');
+		var bw = bar.offsetWidth || 280;
+		var bh = bar.offsetHeight || 36;
+		var left = Math.max(8, Math.min(window.innerWidth - bw - 8, rect.left + rect.width / 2 - bw / 2));
+		var top = rect.top - bh - 8;
+		if (top < 8) top = rect.bottom + 8;
+		bar.style.left = Math.round(left) + 'px';
+		bar.style.top = Math.round(top) + 'px';
+	}
+
+	function ensureBlockChip() {
+		if (blockChipEl) return blockChipEl;
+		var btn = document.createElement('button');
+		btn.type = 'button';
+		btn.className = 'live-block-chip hidden';
+		btn.innerHTML = '✎ MD';
+		btn.setAttribute('title', t('liveSrcHint'));
+		btn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+		btn.addEventListener('click', function (e) {
+			e.preventDefault();
+			e.stopPropagation();
+			if (!hoveredBlock) return;
+			if (hoveredBlock.hasAttribute('data-src-start')) {
+				var r = liveRange(hoveredBlock);
+				openBlockSourceEditor(r.start, r.end);
+			} else {
+				splitEditBlock(hoveredBlock);
+			}
+		});
+		document.body.appendChild(btn);
+		blockChipEl = btn;
+		return btn;
+	}
+
+	function hideBlockChip() {
+		if (blockChipEl) blockChipEl.classList.add('hidden');
+	}
+
+	function positionBlockChip(block) {
+		if (!block || liveLocked() || blockSrcDialogOpen) {
+			hideBlockChip();
+			return;
+		}
+		hoveredBlock = block;
+		var chip = ensureBlockChip();
+		chip.setAttribute('title', liveActive() ? t('liveSrcHint') : t('splitBlockHint'));
+		chip.classList.remove('hidden');
+		var rect = block.getBoundingClientRect();
+		var top = Math.max(52, rect.top + 4);
+		var left = contentDir === 'rtl' ? Math.max(8, rect.left + 6) : Math.min(window.innerWidth - 64, rect.right - 56);
+		chip.style.top = Math.round(top) + 'px';
+		chip.style.left = Math.round(left) + 'px';
 	}
 
 	/* ── Events (delegated on #output once; the node itself is never replaced) ── */
@@ -3990,12 +4448,20 @@
 		});
 
 		out.addEventListener('dblclick', function (e) {
-			if (!liveActive() || liveLocked()) return;
-			var block = liveBlockFor(e.target);
-			if (block && block.classList.contains('live-src')) {
-				e.preventDefault();
-				liveEditSource(block);
+			if (liveLocked()) return;
+			if (e.target.closest('a,button,.code-copy,.mermaid-toolbar,.mermaid-viewport')) return;
+			if (liveActive()) {
+				var liveBlock = liveBlockFor(e.target);
+				if (liveBlock && liveBlock.classList.contains('live-src')) {
+					e.preventDefault();
+					liveEditSource(liveBlock);
+				}
+				return;
 			}
+			var block = previewBlockFor(e.target);
+			if (!block) return;
+			e.preventDefault();
+			splitEditBlock(block);
 		});
 
 		/* Paste with nothing focused (the "paste a whole .md" case) → append as blocks. */
@@ -4015,6 +4481,50 @@
 			$editor.val(LIVE_PLACEHOLDER + '\n');
 			liveFocusStart = 0;
 			renderPreview();
+		});
+
+		document.addEventListener('selectionchange', function () {
+			if (!liveActive()) return;
+			updateInlineToolbarPosition();
+		});
+
+		out.addEventListener('mousemove', function (e) {
+			if (liveLocked()) return;
+			var block = previewBlockFor(e.target);
+			if (!block) {
+				hideBlockChip();
+				return;
+			}
+			if (block !== hoveredBlock || (blockChipEl && blockChipEl.classList.contains('hidden'))) {
+				positionBlockChip(block);
+			}
+		});
+
+		out.addEventListener('mouseleave', function (e) {
+			if (e.relatedTarget && blockChipEl && (e.relatedTarget === blockChipEl || blockChipEl.contains(e.relatedTarget))) return;
+			hideBlockChip();
+		});
+
+		out.addEventListener('scroll', function () {
+			hideInlineToolbar();
+			hideBlockChip();
+		}, { passive: true });
+	}
+
+	function copyActiveDocument() {
+		var text = $editor.val();
+		if (!text) return;
+		var btn = document.getElementById('btn-copy-doc');
+		copyText(text).then(function () {
+			if (!btn) return;
+			btn.classList.add('is-copied');
+			btn.setAttribute('title', t('copyDocDone'));
+			setTimeout(function () {
+				btn.classList.remove('is-copied');
+				btn.setAttribute('title', t('copyDocHint'));
+			}, 1400);
+		}).catch(function () {
+			if (btn) window.alert(t('copyDocFail'));
 		});
 	}
 
@@ -4042,8 +4552,8 @@
 		document.body.classList.toggle('live-mode', mode === 'live');
 		var sel = document.getElementById('set-viewmode');
 		if (sel) sel.value = mode;
+		liveBindEvents();
 		if (mode === 'live') {
-			liveBindEvents();
 			liveEnsureTurndown().then(liveAfterPreview, function () {});
 		}
 		if (!skipRender && api && api.renderPreview) api.renderPreview();
@@ -4385,6 +4895,7 @@
 			this.value = '';
 		});
 
+		document.getElementById('btn-copy-doc').addEventListener('click', copyActiveDocument);
 		document.getElementById('btn-clear').addEventListener('click', clearActiveDocument);
 		document.getElementById('btn-restore-snapshot').addEventListener('click', openSnapshotDialog);
 

@@ -299,9 +299,8 @@
 }
 
 .mermaid-stage {
-  display: inline-block;
+  display: block;
   transform-origin: top center;
-  min-width: min-content;
 }
 
 .markdown-body pre.mermaid {
@@ -318,9 +317,8 @@
 }
 
 .markdown-body .mermaid-wrap svg {
-  display: block;
-  max-width: none;
-  width: auto;
+  display: inline-block;
+  max-width: 100%;
   height: auto;
 }
 
@@ -453,6 +451,103 @@ body.mermaid-fullscreen-open {
   height: auto;
   border-radius: 0.35rem;
   margin: 0.5em 0;
+}
+
+.markdown-body img.preview-zoomable-img {
+  cursor: zoom-in;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.markdown-body img.preview-zoomable-img:hover {
+  box-shadow: 0 4px 16px oklch(0% 0 0 / 0.16);
+}
+
+.media-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: oklch(12% 0.01 260 / 0.88);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  direction: ltr;
+}
+
+.media-lightbox-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background: oklch(var(--b1) / 0.92);
+  border-bottom: 1px solid oklch(var(--b3));
+  color: oklch(var(--bc));
+  z-index: 2;
+}
+
+.media-lightbox-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-lightbox-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.media-lightbox-close {
+  margin-inline-start: 0.25rem;
+}
+
+.media-lightbox-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.media-lightbox-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.media-lightbox-stage {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+.media-lightbox-stage svg {
+  display: block;
+  max-width: none !important;
+  height: auto !important;
+  padding: 1.25rem;
+  border-radius: 0.65rem;
+  background: oklch(var(--b1));
+  box-shadow: 0 20px 50px oklch(0% 0 0 / 0.45);
+}
+
+.media-lightbox-stage img {
+  display: block;
+  max-width: none;
+  max-height: none;
+  border-radius: 0.5rem;
+  box-shadow: 0 20px 50px oklch(0% 0 0 / 0.45);
+  pointer-events: none;
 }
 
 /* Dark themes — softer inline code */

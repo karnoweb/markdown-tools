@@ -51,6 +51,7 @@
 			this.value = '';
 		});
 
+		document.getElementById('btn-copy-doc').addEventListener('click', copyActiveDocument);
 		document.getElementById('btn-clear').addEventListener('click', clearActiveDocument);
 		document.getElementById('btn-restore-snapshot').addEventListener('click', openSnapshotDialog);
 

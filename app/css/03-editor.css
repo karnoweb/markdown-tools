@@ -314,8 +314,21 @@ body.fullview .pane-splitter {
   margin-inline: 0;
 }
 
-/* Clear button sits next to the Preview title; free space goes to its right */
-#btn-clear {
-  margin-inline-start: 0.35rem;
+/* Copy / clear next to Preview title; free space goes to the right */
+.preview-header-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin-inline-end: auto;
+  min-width: 0;
+}
+
+.preview-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+#btn-copy-doc.is-copied {
+  color: oklch(var(--su));
 }

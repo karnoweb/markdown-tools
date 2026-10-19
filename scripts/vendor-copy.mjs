@@ -52,8 +52,22 @@ async function downloadFonts() {
 	const fontsDir = path.join(vendor, 'fonts');
 	const vazirDir = path.join(fontsDir, 'vazirmatn');
 	const firaDir = path.join(fontsDir, 'fira-code');
+	const sahelDir = path.join(fontsDir, 'sahel');
+	const shabnamDir = path.join(fontsDir, 'shabnam');
+	const samimDir = path.join(fontsDir, 'samim');
+	const parastooDir = path.join(fontsDir, 'parastoo');
+	const estedadDir = path.join(fontsDir, 'estedad');
+	const tanhaDir = path.join(fontsDir, 'tanha');
+	const gandomDir = path.join(fontsDir, 'gandom');
 	ensureDir(vazirDir);
 	ensureDir(firaDir);
+	ensureDir(sahelDir);
+	ensureDir(shabnamDir);
+	ensureDir(samimDir);
+	ensureDir(parastooDir);
+	ensureDir(estedadDir);
+	ensureDir(tanhaDir);
+	ensureDir(gandomDir);
 
 	const vazirFiles = [
 		'Vazirmatn-Regular.woff2',
@@ -71,6 +85,24 @@ async function downloadFonts() {
 	];
 	for (const [name, url] of firaFiles) {
 		await download(url, path.join(firaDir, name));
+	}
+
+	const extraPersian = [
+		[path.join(sahelDir, 'Sahel.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/sahel-font@v3.4.0/dist/Sahel.woff2'],
+		[path.join(sahelDir, 'Sahel-Bold.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/sahel-font@v3.4.0/dist/Sahel-Bold.woff2'],
+		[path.join(shabnamDir, 'Shabnam.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam.woff2'],
+		[path.join(shabnamDir, 'Shabnam-Bold.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/shabnam-font@v5.0.1/dist/Shabnam-Bold.woff2'],
+		[path.join(samimDir, 'Samim.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.5/dist/Samim.woff2'],
+		[path.join(samimDir, 'Samim-Bold.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/samim-font@v4.0.5/dist/Samim-Bold.woff2'],
+		[path.join(parastooDir, 'Parastoo.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/parastoo-font@v2.0.1/dist/Parastoo.woff2'],
+		[path.join(parastooDir, 'Parastoo-Bold.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/parastoo-font@v2.0.1/dist/Parastoo-Bold.woff2'],
+		[path.join(estedadDir, 'Estedad-Regular.woff2'), 'https://cdn.jsdelivr.net/gh/aminabedi68/Estedad@v7.3/fonts/webfonts/statics/Estedad-Regular.woff2'],
+		[path.join(estedadDir, 'Estedad-Bold.woff2'), 'https://cdn.jsdelivr.net/gh/aminabedi68/Estedad@v7.3/fonts/webfonts/statics/Estedad-Bold.woff2'],
+		[path.join(tanhaDir, 'Tanha.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/tanha-font@v0.10/dist/Tanha.woff2'],
+		[path.join(gandomDir, 'Gandom.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/gandom-font@v0.8/dist/Gandom.woff2']
+	];
+	for (const [dest, url] of extraPersian) {
+		await download(url, dest);
 	}
 
 	const fontsCss = [
@@ -92,6 +124,90 @@ async function downloadFonts() {
 		"  font-family: 'Vazirmatn';",
 		"  src: url('vazirmatn/Vazirmatn-Bold.woff2') format('woff2');",
 		'  font-weight: 700;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Sahel';",
+		"  src: url('sahel/Sahel.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Sahel';",
+		"  src: url('sahel/Sahel-Bold.woff2') format('woff2');",
+		'  font-weight: 700;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Shabnam';",
+		"  src: url('shabnam/Shabnam.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Shabnam';",
+		"  src: url('shabnam/Shabnam-Bold.woff2') format('woff2');",
+		'  font-weight: 700;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Samim';",
+		"  src: url('samim/Samim.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Samim';",
+		"  src: url('samim/Samim-Bold.woff2') format('woff2');",
+		'  font-weight: 700;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Parastoo';",
+		"  src: url('parastoo/Parastoo.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Parastoo';",
+		"  src: url('parastoo/Parastoo-Bold.woff2') format('woff2');",
+		'  font-weight: 700;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Estedad';",
+		"  src: url('estedad/Estedad-Regular.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Estedad';",
+		"  src: url('estedad/Estedad-Bold.woff2') format('woff2');",
+		'  font-weight: 700;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Tanha';",
+		"  src: url('tanha/Tanha.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Gandom';",
+		"  src: url('gandom/Gandom.woff2') format('woff2');",
+		'  font-weight: 400;',
 		'  font-style: normal;',
 		'  font-display: swap;',
 		'}',

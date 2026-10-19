@@ -52,12 +52,16 @@ body.fullview.mobile-view-preview .editor-pane--preview {
 
 body.fullview .editor-pane--preview .pane-header {
   flex-shrink: 0;
-  justify-content: flex-end;
+  justify-content: space-between;
   background: oklch(var(--b3) / 0.35);
   border-radius: 0.75rem 0.75rem 0 0;
 }
 
-body.fullview .editor-pane--preview .pane-header > span {
+body.fullview .editor-pane--preview .pane-header > span:not(.preview-header-start) {
+  display: none;
+}
+
+body.fullview .editor-pane--preview .preview-header-start > [data-i18n="preview"] {
   display: none;
 }
 

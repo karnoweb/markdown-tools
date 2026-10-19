@@ -10,6 +10,8 @@
 	var DIR_KEY = 'rtlmd-dir';
 	var FONT_KEY = 'rtlmd-font-size';
 	var FONT_SIZES = ['xs', 'sm', 'md', 'lg', 'xl'];
+	var FONT_FAMILY_KEY = 'rtlmd-font-family';
+	var FONT_FAMILIES = ['vazirmatn', 'sahel', 'shabnam', 'samim', 'estedad', 'parastoo', 'tanha', 'gandom', 'tahoma', 'system'];
 	var FULLVIEW_KEY = 'rtlmd-fullview';
 	var SCROLL_SYNC_KEY = 'rtlmd-scroll-sync';
 	var PREFS_VER_KEY = 'rtlmd-prefs-ver';

@@ -1,6 +1,6 @@
 'use strict';
 
-var CACHE_NAME = 'rtlmd-v23';
+var CACHE_NAME = 'rtlmd-v26';
 var PRECACHE = [
 	'./',
 	'./index.html',
@@ -29,6 +29,18 @@ var PRECACHE = [
 	'./assets/vendor/fonts/vazirmatn/Vazirmatn-Regular.woff2',
 	'./assets/vendor/fonts/vazirmatn/Vazirmatn-Medium.woff2',
 	'./assets/vendor/fonts/vazirmatn/Vazirmatn-Bold.woff2',
+	'./assets/vendor/fonts/sahel/Sahel.woff2',
+	'./assets/vendor/fonts/sahel/Sahel-Bold.woff2',
+	'./assets/vendor/fonts/shabnam/Shabnam.woff2',
+	'./assets/vendor/fonts/shabnam/Shabnam-Bold.woff2',
+	'./assets/vendor/fonts/samim/Samim.woff2',
+	'./assets/vendor/fonts/samim/Samim-Bold.woff2',
+	'./assets/vendor/fonts/parastoo/Parastoo.woff2',
+	'./assets/vendor/fonts/parastoo/Parastoo-Bold.woff2',
+	'./assets/vendor/fonts/estedad/Estedad-Regular.woff2',
+	'./assets/vendor/fonts/estedad/Estedad-Bold.woff2',
+	'./assets/vendor/fonts/tanha/Tanha.woff2',
+	'./assets/vendor/fonts/gandom/Gandom.woff2',
 	'./assets/vendor/fonts/fira-code/FiraCode-Regular.woff2',
 	'./assets/vendor/fonts/fira-code/FiraCode-Medium.woff2',
 	'./assets/vendor/prism/prism.min.js',

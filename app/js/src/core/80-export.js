@@ -204,6 +204,11 @@
 		for (i = 0; i < nodes.length; i++) {
 			if (nodes[i].parentNode) nodes[i].parentNode.removeChild(nodes[i]);
 		}
+		nodes = root.querySelectorAll('.preview-zoomable-img');
+		for (i = 0; i < nodes.length; i++) {
+			nodes[i].classList.remove('preview-zoomable-img');
+			nodes[i].removeAttribute('data-lightbox-ready');
+		}
 		/* mermaid: drop zoom toolbar/viewport wrappers, keep the rendered svg */
 		nodes = root.querySelectorAll('.mermaid-wrap');
 		for (i = 0; i < nodes.length; i++) {

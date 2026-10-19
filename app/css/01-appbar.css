@@ -151,6 +151,13 @@ label.swap.icon-btn.btn-active {
   width: 5.5rem;
 }
 
+.font-family-wrap .select {
+  min-height: 2rem;
+  height: 2rem;
+  font-size: 0.72rem;
+  max-width: 8.5rem;
+}
+
 .palette-wrap .select {
   min-height: 2rem;
   height: 2rem;

@@ -65,6 +65,40 @@
 		applyFontSize(storageGet(FONT_KEY, 'md'));
 	}
 
+	function normalizeFontFamily(id) {
+		return FONT_FAMILIES.indexOf(id) !== -1 ? id : 'vazirmatn';
+	}
+
+	function applyFontFamily(id, skipRender) {
+		id = normalizeFontFamily(id);
+		document.documentElement.setAttribute('data-font-family', id);
+		var sel = document.getElementById('font-family-select');
+		if (sel) sel.value = id;
+		storageSet(FONT_FAMILY_KEY, id);
+		if (!skipRender && typeof renderPreview === 'function') renderPreview();
+	}
+
+	function initFontFamily() {
+		applyFontFamily(storageGet(FONT_FAMILY_KEY, 'vazirmatn'), true);
+	}
+
+	function mermaidFontFamily() {
+		var id = normalizeFontFamily(document.documentElement.getAttribute('data-font-family') || 'vazirmatn');
+		var map = {
+			vazirmatn: 'Vazirmatn, Tahoma, sans-serif',
+			sahel: 'Sahel, Vazirmatn, Tahoma, sans-serif',
+			shabnam: 'Shabnam, Vazirmatn, Tahoma, sans-serif',
+			samim: 'Samim, Vazirmatn, Tahoma, sans-serif',
+			estedad: 'Estedad, Vazirmatn, Tahoma, sans-serif',
+			parastoo: 'Parastoo, Vazirmatn, Tahoma, sans-serif',
+			tanha: 'Tanha, Vazirmatn, Tahoma, sans-serif',
+			gandom: 'Gandom, Vazirmatn, Tahoma, sans-serif',
+			tahoma: 'Tahoma, Segoe UI, sans-serif',
+			system: 'system-ui, Segoe UI, sans-serif'
+		};
+		return map[id] || map.vazirmatn;
+	}
+
 	function setFullview(on) {
 		$('body').toggleClass('fullview', on);
 		$('#fullview-toggle').prop('checked', on);

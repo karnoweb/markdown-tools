@@ -20,6 +20,8 @@
 
 		<script>
 		(function () {
+			/* Bump RTLMD_ASSET_VER when CSS/JS changes (same ?v= on all app stylesheets + bundle). */
+			window.RTLMD_ASSET_VER = '12';
 			var PREFS_VER = '3';
 			try {
 				if (localStorage.getItem('rtlmd-prefs-ver') !== PREFS_VER) {
@@ -40,6 +42,10 @@
 			if (['xs', 'sm', 'lg', 'xl'].indexOf(fontSize) !== -1) {
 				document.documentElement.setAttribute('data-font-size', fontSize);
 			}
+			var fontFamily = localStorage.getItem('rtlmd-font-family');
+			if (['vazirmatn', 'sahel', 'shabnam', 'samim', 'estedad', 'parastoo', 'tanha', 'gandom', 'tahoma', 'system'].indexOf(fontFamily) !== -1) {
+				document.documentElement.setAttribute('data-font-family', fontFamily);
+			}
 			var mobile = matchMedia('(max-width: 768px)').matches;
 			if (mobile || localStorage.getItem('rtlmd-sidebar') === '0') {
 				document.documentElement.classList.add('sidebar-collapsed');
@@ -53,15 +59,15 @@
 		<link id="prism-theme" href="assets/vendor/prism/themes/prism-tomorrow.min.css" rel="stylesheet">
 		<link href="assets/vendor/tailwind.css" rel="stylesheet">
 		<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
-		<link rel="stylesheet" href="app/css/00-tokens-base.css?v=7">
-		<link rel="stylesheet" href="app/css/01-appbar.css?v=8">
-		<link rel="stylesheet" href="app/css/02-sidebar.css?v=7">
-		<link rel="stylesheet" href="app/css/03-editor.css?v=8">
-		<link rel="stylesheet" href="app/css/04-fullview.css?v=7">
-		<link rel="stylesheet" href="app/css/05-preview.css?v=7">
-		<link rel="stylesheet" href="app/css/06-responsive.css?v=8">
-		<link rel="stylesheet" href="app/css/07-components.css?v=8">
-		<link rel="stylesheet" href="app/css/08-settings.css?v=7">
+		<link rel="stylesheet" href="app/css/00-tokens-base.css?v=12">
+		<link rel="stylesheet" href="app/css/01-appbar.css?v=12">
+		<link rel="stylesheet" href="app/css/02-sidebar.css?v=12">
+		<link rel="stylesheet" href="app/css/03-editor.css?v=12">
+		<link rel="stylesheet" href="app/css/04-fullview.css?v=12">
+		<link rel="stylesheet" href="app/css/05-preview.css?v=12">
+		<link rel="stylesheet" href="app/css/06-responsive.css?v=12">
+		<link rel="stylesheet" href="app/css/07-components.css?v=12">
+		<link rel="stylesheet" href="app/css/08-settings.css?v=12">
 	</head>
 	<body>
 		<header id="header" class="app-bar">
@@ -101,10 +107,26 @@
 					</select>
 				</label>
 
+				<label class="font-family-wrap" for="font-family-select" title="Reading font">
+					<span class="sr-only">Reading font</span>
+					<select id="font-family-select" class="select select-sm select-bordered" aria-label="Reading font">
+						<option value="vazirmatn">وزیرمتن · Vazirmatn</option>
+						<option value="sahel">ساحل · Sahel</option>
+						<option value="shabnam">شبنم · Shabnam</option>
+						<option value="samim">صمیم · Samim</option>
+						<option value="estedad">استعداد · Estedad</option>
+						<option value="parastoo">پرستو · Parastoo</option>
+						<option value="tanha">تنها · Tanha</option>
+						<option value="gandom">گندم · Gandom</option>
+						<option value="tahoma">Tahoma</option>
+						<option value="system">System</option>
+					</select>
+				</label>
+
 				<label class="swap icon-btn" title="Full preview">
 					<input type="checkbox" id="fullview-toggle" aria-label="Full preview">
-					<svg class="swap-on w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18L18 6M6 6l12 12"/></svg>
-					<svg class="swap-off w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5-5"/></svg>
+					<svg class="swap-on w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6.75 7.5h10.5M6.75 12h10.5m-10.5 4.5h10.5M4.5 6.75V17.25c0 .414.336.75.75.75h13.5a.75.75 0 00.75-.75V6.75a.75.75 0 00-.75-.75H5.25a.75.75 0 00-.75.75z"/></svg>
+					<svg class="swap-off w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
 				</label>
 
 				<label class="swap icon-btn" title="Scroll sync OFF — click to make editor and preview scroll together">
@@ -250,12 +272,19 @@
 				<div id="pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" title="Drag to resize (double-click to reset)"></div>
 				<div class="editor-pane editor-pane--preview">
 					<div class="pane-header pane-header--preview">
-						<span data-i18n="preview">Preview</span>
-						<button type="button" id="btn-clear" class="icon-btn-xs" data-i18n-title="clearHint" title="Clear the whole document (a snapshot is saved first)" aria-label="Clear document">
-							<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-						</button>
+						<span class="preview-header-start">
+							<button type="button" id="toc-toggle" class="icon-btn-xs toc-toggle-btn hidden" data-i18n-title="toc" title="Contents" aria-label="Contents" aria-pressed="false">&#9776;</button>
+							<span data-i18n="preview">Preview</span>
+							<span class="preview-header-actions">
+								<button type="button" id="btn-copy-doc" class="icon-btn-xs" data-i18n-title="copyDocHint" title="Copy entire document as Markdown" aria-label="Copy document">
+									<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+								</button>
+								<button type="button" id="btn-clear" class="icon-btn-xs" data-i18n-title="clearHint" title="Clear the whole document (a snapshot is saved first)" aria-label="Clear document">
+									<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+								</button>
+							</span>
+						</span>
 						<span id="live-hint" class="live-hint hidden" role="status"></span>
-						<button type="button" id="toc-toggle" class="icon-btn-xs toc-toggle-btn hidden" data-i18n-title="toc" title="Contents" aria-label="Contents" aria-pressed="false">&#9776;</button>
 						<div class="export-actions" role="group" aria-label="Export">
 							<button type="button" class="btn btn-xs btn-ghost" data-export="html" title="Download HTML">HTML</button>
 							<button type="button" class="btn btn-xs btn-ghost" data-export="markdown" title="Download Markdown">Markdown</button>
@@ -289,6 +318,23 @@
 			</div>
 			<span class="footer-love" dir="rtl">ساخته‌شده با <span class="footer-heart" aria-label="عشق">♥</span> برای همکاران عزیز</span>
 		</footer>
+
+		<dialog id="block-src-dialog" class="block-src-dialog">
+			<form method="dialog" class="block-src-dialog-form">
+				<div class="block-src-dialog-head">
+					<h2 class="block-src-dialog-title" data-i18n="editBlockSource">Edit block source</h2>
+					<button type="button" class="icon-btn-xs block-src-dialog-close" data-i18n-title="close" title="Close" aria-label="Close">
+						<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.75" d="M6 18L18 6M6 6l12 12"/></svg>
+					</button>
+				</div>
+				<textarea id="block-src-textarea" class="block-src-textarea" dir="ltr" spellcheck="false" aria-label="Markdown source"></textarea>
+				<p class="block-src-dialog-hint" data-i18n="editBlockSourceHint">Ctrl+Enter to save · Esc to cancel</p>
+				<div class="block-src-dialog-actions">
+					<button type="button" class="btn btn-sm btn-ghost block-src-dialog-cancel" data-i18n="close">Close</button>
+					<button type="submit" class="btn btn-sm btn-primary" data-i18n="saveBlockSource">Save</button>
+				</div>
+			</form>
+		</dialog>
 
 		<dialog id="settings-dialog" class="settings-dialog">
 			<form id="settings-form" method="dialog">
@@ -334,6 +380,6 @@
 		<script src="assets/vendor/mermaid/mermaid.min.js"></script>
 		<script src="assets/vendor/html-to-image/html-to-image.js"></script>
 		<script src="assets/vendor/katex/katex.min.js"></script>
-		<script src="app/js/rtlmd.bundle.js?v=9"></script>
+		<script src="app/js/rtlmd.bundle.js?v=12"></script>
 	</body>
 </html>
