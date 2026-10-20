@@ -70,6 +70,18 @@
 			ok(!!bdi && bdi.textContent === 'این سند خرید', 'code bidi wraps Persian run');
 			ok(el.textContent.indexOf('$x') !== -1, 'code bidi keeps Latin token');
 		})();
+		(function () {
+			ok(normalizeMermaidSource('Q -->|مثال: 3\\|4500| Q3') === 'Q -->|مثال: 3#124;4500| Q3', 'mermaid escaped pipe normalized');
+			ok(detectSmartDir('QR بود؟', 'ltr') === 'rtl', 'smart dir detects RTL after technical acronym');
+			ok(detectSmartDir('RFID روی دستگاه در عمل مثل اثرانگشت است', 'ltr') === 'rtl', 'smart dir detects RTL starting with RFID');
+			ok(detectSmartDir('Hello world this is English', 'rtl') === 'ltr', 'smart dir detects pure English as LTR');
+			ok(flipArrowsInRtlText('ورود → ثبت + کمد') === 'ورود ← ثبت + کمد', 'arrow flip converts rightward arrow in RTL text');
+			ok(flipArrowsInRtlText('مرحله ۱ -> مرحله ۲') === 'مرحله ۱ <- مرحله ۲', 'arrow flip converts spaced ASCII arrow in RTL text');
+			ok(flipArrowsInRtlText('$table->id()') === '$table->id()', 'arrow flip preserves unspaced code arrow');
+			ok(flipArrowsInRtlText('مثال: 3|4500').indexOf('\u200E3|4500\u200E') !== -1, 'compound numeric pipe token guarded with LRM');
+			ok(parseMarkdown('flowchart TD\n    A --> B\n    B --> C').indexOf('class="mermaid"') !== -1, 'bare unfenced flowchart rendered as mermaid');
+			ok(parseMarkdown('```\nflowchart TD\n    A --> B\n```').indexOf('class="mermaid"') !== -1, 'untagged fence flowchart rendered as mermaid');
+		})();
 		ok(storageGet(SCROLL_SYNC_KEY, '0') === '0' || storageGet(SCROLL_SYNC_KEY, '0') === '1', 'scroll sync pref');
 		ok(typeof setScrollSync === 'function' && scrollSyncOn === (storageGet(SCROLL_SYNC_KEY, '0') === '1'), 'scroll sync default wiring');
 		var ranges = sourceBlockRanges('# Title\n\nHello\n');

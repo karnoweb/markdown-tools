@@ -86,13 +86,23 @@
 		var id = normalizeFontFamily(document.documentElement.getAttribute('data-font-family') || 'vazirmatn');
 		var map = {
 			vazirmatn: 'Vazirmatn, Tahoma, sans-serif',
+			iranyekan: 'IRANYekan, Vazirmatn, Tahoma, sans-serif',
 			sahel: 'Sahel, Vazirmatn, Tahoma, sans-serif',
 			shabnam: 'Shabnam, Vazirmatn, Tahoma, sans-serif',
 			samim: 'Samim, Vazirmatn, Tahoma, sans-serif',
 			estedad: 'Estedad, Vazirmatn, Tahoma, sans-serif',
+			'estedad-fd': '"Estedad FD", Estedad, Vazirmatn, Tahoma, sans-serif',
 			parastoo: 'Parastoo, Vazirmatn, Tahoma, sans-serif',
 			tanha: 'Tanha, Vazirmatn, Tahoma, sans-serif',
+			nahid: 'Nahid, Vazirmatn, Tahoma, sans-serif',
 			gandom: 'Gandom, Vazirmatn, Tahoma, sans-serif',
+			mikhak: 'Mikhak, Vazirmatn, Tahoma, sans-serif',
+			'mikhak-fd': '"Mikhak FD", Mikhak, Vazirmatn, Tahoma, sans-serif',
+			nika: 'Nika, Vazirmatn, Tahoma, sans-serif',
+			arad: 'Arad, Vazirmatn, Tahoma, sans-serif',
+			behdad: 'Behdad, Vazirmatn, Tahoma, sans-serif',
+			ganjname: 'GanjNamehSans, Vazirmatn, Tahoma, sans-serif',
+			shahab: 'Shahab, Vazirmatn, Tahoma, sans-serif',
 			tahoma: 'Tahoma, Segoe UI, sans-serif',
 			system: 'system-ui, Segoe UI, sans-serif'
 		};

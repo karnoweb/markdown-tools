@@ -945,6 +945,46 @@ html[data-font-family="gandom"] {
   --rtlmd-font: 'Gandom', 'Vazirmatn', Tahoma, sans-serif;
 }
 
+html[data-font-family="iranyekan"] {
+  --rtlmd-font: 'IRANYekan', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="nahid"] {
+  --rtlmd-font: 'Nahid', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="mikhak"] {
+  --rtlmd-font: 'Mikhak', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="mikhak-fd"] {
+  --rtlmd-font: 'Mikhak FD', 'Mikhak', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="estedad-fd"] {
+  --rtlmd-font: 'Estedad FD', 'Estedad', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="nika"] {
+  --rtlmd-font: 'Nika', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="arad"] {
+  --rtlmd-font: 'Arad', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="behdad"] {
+  --rtlmd-font: 'Behdad', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="ganjname"] {
+  --rtlmd-font: 'GanjNamehSans', 'Vazirmatn', Tahoma, sans-serif;
+}
+
+html[data-font-family="shahab"] {
+  --rtlmd-font: 'Shahab', 'Vazirmatn', Tahoma, sans-serif;
+}
+
 html[data-font-family="tahoma"] {
   --rtlmd-font: Tahoma, 'Segoe UI', 'Arial Unicode MS', sans-serif;
 }

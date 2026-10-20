@@ -59,6 +59,13 @@ async function downloadFonts() {
 	const estedadDir = path.join(fontsDir, 'estedad');
 	const tanhaDir = path.join(fontsDir, 'tanha');
 	const gandomDir = path.join(fontsDir, 'gandom');
+	const nahidDir = path.join(fontsDir, 'nahid');
+	const mikhakDir = path.join(fontsDir, 'mikhak');
+	const nikaDir = path.join(fontsDir, 'nika');
+	const aradDir = path.join(fontsDir, 'arad');
+	const behdadDir = path.join(fontsDir, 'behdad');
+	const ganjnameDir = path.join(fontsDir, 'ganjname');
+	const shahabDir = path.join(fontsDir, 'shahab');
 	ensureDir(vazirDir);
 	ensureDir(firaDir);
 	ensureDir(sahelDir);
@@ -68,6 +75,13 @@ async function downloadFonts() {
 	ensureDir(estedadDir);
 	ensureDir(tanhaDir);
 	ensureDir(gandomDir);
+	ensureDir(nahidDir);
+	ensureDir(mikhakDir);
+	ensureDir(nikaDir);
+	ensureDir(aradDir);
+	ensureDir(behdadDir);
+	ensureDir(ganjnameDir);
+	ensureDir(shahabDir);
 
 	const vazirFiles = [
 		'Vazirmatn-Regular.woff2',
@@ -99,10 +113,19 @@ async function downloadFonts() {
 		[path.join(estedadDir, 'Estedad-Regular.woff2'), 'https://cdn.jsdelivr.net/gh/aminabedi68/Estedad@v7.3/fonts/webfonts/statics/Estedad-Regular.woff2'],
 		[path.join(estedadDir, 'Estedad-Bold.woff2'), 'https://cdn.jsdelivr.net/gh/aminabedi68/Estedad@v7.3/fonts/webfonts/statics/Estedad-Bold.woff2'],
 		[path.join(tanhaDir, 'Tanha.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/tanha-font@v0.10/dist/Tanha.woff2'],
-		[path.join(gandomDir, 'Gandom.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/gandom-font@v0.8/dist/Gandom.woff2']
+		[path.join(gandomDir, 'Gandom.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/gandom-font@v0.8/dist/Gandom.woff2'],
+		[path.join(nahidDir, 'Nahid.woff2'), 'https://cdn.jsdelivr.net/gh/rastikerdar/nahid-font@v0.3.0/dist/Nahid.woff2'],
+		[path.join(mikhakDir, 'Mikhak-VF.woff2'), 'https://cdn.jsdelivr.net/gh/aminabedi68/Mikhak@v3.2/fonts/webfonts/variable/Mikhak[DSTY,KSHD,wght].woff2'],
+		[path.join(mikhakDir, 'Mikhak-FD-VF.woff2'), 'https://cdn.jsdelivr.net/gh/aminabedi68/Mikhak@v3.2/fonts/webfonts/variable/Mikhak-FD[DSTY,KSHD,wght].woff2'],
+		[path.join(estedadDir, 'Estedad-FD-VF.woff2'), 'https://cdn.jsdelivr.net/gh/aminabedi68/Estedad@v7.3/fonts/webfonts/variable/Estedad-FD[KSHD,wght].woff2'],
+		[path.join(nikaDir, 'Nika-Regular.woff2'), 'https://cdn.jsdelivr.net/gh/font-store/NikaFont@v1.0.0/web/Nika-Regular.woff2'],
+		[path.join(aradDir, 'Arad-VF.woff2'), 'https://cdn.jsdelivr.net/gh/MDarvishi5124/Arad@v1.010/fonts/variable/Arad-VF.woff2'],
+		[path.join(behdadDir, 'Behdad-Regular.woff2'), 'https://cdn.jsdelivr.net/gh/font-store/BehdadFont@v0.0.3/web/Behdad-Regular.woff2'],
+		[path.join(ganjnameDir, 'GanjNamehSans-Regular.woff2'), 'https://cdn.jsdelivr.net/gh/font-store/GanjnamehFont@v0.0.4/web/GanjNamehSans-Regular.woff2'],
+		[path.join(shahabDir, 'Shahab-Regular.woff2'), 'https://cdn.jsdelivr.net/gh/font-store/ShahabFont@v0.0.2/web/Shahab-Regular.woff2']
 	];
 	for (const [dest, url] of extraPersian) {
-		await download(url, dest);
+		if (!fs.existsSync(dest)) await download(url, dest);
 	}
 
 	const fontsCss = [
@@ -207,6 +230,90 @@ async function downloadFonts() {
 		'@font-face {',
 		"  font-family: 'Gandom';",
 		"  src: url('gandom/Gandom.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'IRANYekan';",
+		"  src: url('iranyekan/iranyekanwebregular.woff') format('woff');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'IRANYekan';",
+		"  src: url('iranyekan/iranyekanwebmedium.woff') format('woff');",
+		'  font-weight: 500;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'IRANYekan';",
+		"  src: url('iranyekan/iranyekanwebbold.woff') format('woff');",
+		'  font-weight: 700;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Nahid';",
+		"  src: url('nahid/Nahid.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Mikhak';",
+		"  src: url('mikhak/Mikhak-VF.woff2') format('woff2');",
+		'  font-weight: 100 900;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Mikhak FD';",
+		"  src: url('mikhak/Mikhak-FD-VF.woff2') format('woff2');",
+		'  font-weight: 100 900;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Estedad FD';",
+		"  src: url('estedad/Estedad-FD-VF.woff2') format('woff2');",
+		'  font-weight: 100 900;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Nika';",
+		"  src: url('nika/Nika-Regular.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Arad';",
+		"  src: url('arad/Arad-VF.woff2') format('woff2');",
+		'  font-weight: 100 900;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Behdad';",
+		"  src: url('behdad/Behdad-Regular.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'GanjNamehSans';",
+		"  src: url('ganjname/GanjNamehSans-Regular.woff2') format('woff2');",
+		'  font-weight: 400;',
+		'  font-style: normal;',
+		'  font-display: swap;',
+		'}',
+		'@font-face {',
+		"  font-family: 'Shahab';",
+		"  src: url('shahab/Shahab-Regular.woff2') format('woff2');",
 		'  font-weight: 400;',
 		'  font-style: normal;',
 		'  font-display: swap;',

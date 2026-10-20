@@ -12,7 +12,7 @@
 	var LIVE_EDITABLE_TAGS = { P: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, UL: 1, OL: 1, BLOCKQUOTE: 1 };
 	var LIVE_INLINE_OK = {
 		P: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, UL: 1, OL: 1, LI: 1, BLOCKQUOTE: 1,
-		STRONG: 1, B: 1, EM: 1, I: 1, DEL: 1, S: 1, A: 1, CODE: 1, BR: 1, INPUT: 1
+		STRONG: 1, B: 1, EM: 1, I: 1, DEL: 1, S: 1, A: 1, CODE: 1, BR: 1, INPUT: 1, BDI: 1, SPAN: 1
 	};
 
 	var liveTurndown = null;
@@ -142,7 +142,7 @@
 		var clone = el.cloneNode(true);
 		clone.removeAttribute('contenteditable');
 		wrap.appendChild(clone);
-		return liveTurndown.turndown(wrap).replace(/\u00a0/g, ' ').trim();
+		return liveTurndown.turndown(wrap).replace(/\u00a0/g, ' ').replace(/[\u200e\u200f]/g, '').trim();
 	}
 
 	/* ── Source mapping ── */
@@ -154,6 +154,11 @@
 		var parts = splitFrontMatter(src);
 		var body = parts.body;
 		var base = src.length - body.length;
+		if (typeof isBareMermaidBlock === 'function' && isBareMermaidBlock(body)) {
+			var trimStart = body.search(/\S/);
+			var trimEnd = body.replace(/\s+$/, '').length;
+			return [{ start: base + (trimStart >= 0 ? trimStart : 0), end: base + trimEnd, type: 'code' }];
+		}
 		var tokens = marked.lexer(body);
 		var ranges = [];
 		var pos = 0;
@@ -377,7 +382,11 @@
 	}
 
 	function liveCleanPaste(text) {
-		return String(text || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+		var clean = String(text || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+		if (typeof isBareMermaidBlock === 'function' && isBareMermaidBlock(clean)) {
+			return '```mermaid\n' + clean.trim() + '\n```';
+		}
+		return clean;
 	}
 
 	function liveAppendMarkdown(text) {
@@ -433,6 +442,11 @@
 		}
 
 		function onKey(e) {
+			if (isHalfSpaceEvent(e) && document.activeElement === ta) {
+				e.preventDefault();
+				insertHalfSpaceInTextarea(ta);
+				return;
+			}
 			if (e.key === 'Escape') {
 				e.preventDefault();
 				close(false);
@@ -689,6 +703,14 @@
 			if (!block || block.getAttribute('contenteditable') !== 'true') return;
 			if (e.key === 'Escape') {
 				block.blur();
+				return;
+			}
+			if (isHalfSpaceEvent(e)) {
+				e.preventDefault();
+				document.execCommand('insertText', false, '\u200C');
+				block.__liveDirty = true;
+				clearTimeout(liveInputTimer);
+				liveInputTimer = setTimeout(function () { liveWriteBlock(block); }, 250);
 				return;
 			}
 			if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing &&

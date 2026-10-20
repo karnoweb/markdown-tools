@@ -50,15 +50,27 @@
 }
 
 .markdown-body strong,
-.markdown-body b { font-weight: 700; }
+.markdown-body b {
+  font-weight: 700;
+  unicode-bidi: isolate;
+}
 
 .markdown-body em,
-.markdown-body i { font-style: italic; }
+.markdown-body i {
+  font-style: italic;
+  unicode-bidi: isolate;
+}
+
+.markdown-body del,
+.markdown-body s {
+  unicode-bidi: isolate;
+}
 
 .markdown-body a {
   word-break: break-word;
   color: oklch(var(--p));
   text-underline-offset: 0.15em;
+  unicode-bidi: isolate;
 }
 
 .markdown-body ul,
@@ -320,6 +332,21 @@
   display: inline-block;
   max-width: 100%;
   height: auto;
+}
+
+.markdown-body .mermaid-wrap[data-mermaid-rtl="1"] foreignObject div,
+.markdown-body .mermaid-wrap[data-mermaid-rtl="1"] foreignObject span,
+.markdown-body .mermaid-wrap[data-mermaid-rtl="1"] foreignObject p,
+.markdown-body .mermaid-wrap foreignObject [dir="rtl"],
+.media-lightbox-stage svg foreignObject [dir="rtl"] {
+  direction: rtl;
+  unicode-bidi: isolate;
+}
+
+.markdown-body .mermaid-wrap foreignObject [dir="ltr"],
+.media-lightbox-stage svg foreignObject [dir="ltr"] {
+  direction: ltr;
+  unicode-bidi: isolate;
 }
 
 .markdown-body .table-scroll {

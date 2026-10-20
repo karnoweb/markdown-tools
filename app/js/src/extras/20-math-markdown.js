@@ -114,6 +114,47 @@
 		return out + body.slice(pos);
 	}
 
+	/* Wrap unfenced Mermaid diagrams (e.g. when a user copies raw `flowchart TD ...`
+	   from ChatGPT's diagram Code tab without ```mermaid fences) into fenced blocks
+	   before marked lexes them, preventing 4-space indented lines inside `subgraph`
+	   from being split into indented code blocks. */
+	function wrapBareMermaidBlocks(body) {
+		if (!BARE_MERMAID_HEADER_RE.test(body)) return body;
+		if (isBareMermaidBlock(body)) {
+			return '```mermaid\n' + body.trim() + '\n```\n';
+		}
+		var chunks = body.split(/\n{2,}/);
+		var out = [];
+		var i = 0;
+		while (i < chunks.length) {
+			if (BARE_MERMAID_HEADER_RE.test(chunks[i])) {
+				var diagramLines = [chunks[i]];
+				var j = i + 1;
+				while (j < chunks.length) {
+					var next = chunks[j];
+					var nextTrim = next.trim();
+					if (!nextTrim) { j++; continue; }
+					if (/^(?:#{1,6}\s|[-*+]\s|\d+\.\s|>\s|\|.*\||---+$|\u0000CODE)/.test(nextTrim)) break;
+					if (/^(?:[ \t]+|[A-Za-z0-9_]+(?:\s*-->|\s*---|\s*-\.-|\s*==>|\s*[\[\(\{])|subgraph\b|end\b|direction\b|style\b|classDef\b|class\b|click\b|linkStyle\b|%%)/.test(next)) {
+						diagramLines.push(next);
+						j++;
+					} else {
+						break;
+					}
+				}
+				var candidate = diagramLines.join('\n\n');
+				if (isBareMermaidBlock(candidate)) {
+					out.push('```mermaid\n' + candidate.trim() + '\n```');
+					i = j;
+					continue;
+				}
+			}
+			out.push(chunks[i]);
+			i++;
+		}
+		return out.join('\n\n');
+	}
+
 	function preprocessMarkdown(src) {
 		mathPlaceholders = [];
 		var parts = splitFrontMatter(src);
@@ -122,6 +163,8 @@
 		/* Order matters: extract whole fenced blocks first so the inline-code regex
 		   below never runs its backtick matching across (or inside) a fence's content. */
 		var codeStore = [];
+		body = protectCodeRegions(body, FENCE_RE, codeStore);
+		body = wrapBareMermaidBlocks(body);
 		body = protectCodeRegions(body, FENCE_RE, codeStore);
 		body = protectCodeRegions(body, INLINE_CODE_RE, codeStore);
 

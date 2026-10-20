@@ -19,7 +19,7 @@
 	var FONT_KEY = 'rtlmd-font-size';
 	var FONT_SIZES = ['xs', 'sm', 'md', 'lg', 'xl'];
 	var FONT_FAMILY_KEY = 'rtlmd-font-family';
-	var FONT_FAMILIES = ['vazirmatn', 'sahel', 'shabnam', 'samim', 'estedad', 'parastoo', 'tanha', 'gandom', 'tahoma', 'system'];
+	var FONT_FAMILIES = ['vazirmatn', 'iranyekan', 'sahel', 'shabnam', 'samim', 'estedad', 'estedad-fd', 'parastoo', 'tanha', 'nahid', 'gandom', 'mikhak', 'mikhak-fd', 'nika', 'arad', 'behdad', 'ganjname', 'shahab', 'tahoma', 'system'];
 	var FULLVIEW_KEY = 'rtlmd-fullview';
 	var SCROLL_SYNC_KEY = 'rtlmd-scroll-sync';
 	var PREFS_VER_KEY = 'rtlmd-prefs-ver';
@@ -79,6 +79,15 @@
 		return LANG_ALIASES[lang] || lang.replace(/[^a-z0-9+#.-]/gi, '');
 	}
 
+	var BARE_MERMAID_HEADER_RE = /^\s*(?:%%\{[\s\S]*?\}%%\s*)*(?:flowchart(?:\s+(?:TB|TD|BT|RL|LR))?|graph\s+(?:TB|TD|BT|RL|LR)|sequenceDiagram|classDiagram(?:-v2)?|stateDiagram(?:-v2)?|erDiagram|gantt|journey|gitGraph|pie(?:\s+showData)?|mindmap|timeline|quadrantChart|sankey-beta|xychart-beta|block-beta|packet-beta|architecture-beta|C4Context|C4Container|C4Component|C4Dynamic|C4Deployment)\b/;
+
+	function isBareMermaidBlock(text) {
+		var s = String(text || '').trim();
+		if (!s || s.indexOf('\n') === -1) return false;
+		if (!BARE_MERMAID_HEADER_RE.test(s)) return false;
+		return /-->|---|-\.-|==>|->>|-->>|\bsubgraph\b|\bparticipant\b|\bstate\b|\bsection\b|\|\|--|\}\|--/.test(s);
+	}
+
 	/* Custom marked renderers own escaping — without this, <?php ... $table-> eats the DOM as a bogus comment. */
 	function escapeHtml(s) {
 		return String(s)
@@ -100,6 +109,123 @@
 
 	function dirAttr() {
 		return ' dir="' + contentDir + '"';
+	}
+
+	/* ── Smart RTL / Bidi & Arrow helpers (inspired by AI RTL) ── */
+	var RTL_CHAR_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+	var RTL_CHAR_GLOBAL_RE = /[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g;
+	var LTR_CHAR_GLOBAL_RE = /[A-Za-z]/g;
+
+	var UNICODE_ARROW_FLIP_MAP = {
+		'→': '←',
+		'⇒': '⇐',
+		'⇛': '⇚',
+		'⟶': '⟵',
+		'⟹': '⟸',
+		'➡': '⬅',
+		'⮕': '⬅',
+		'▶': '◀',
+		'▷': '◁',
+		'►': '◄',
+		'▸': '◂',
+		'▻': '◅',
+		'⇨': '⇦',
+		'⇾': '⇽',
+		'↦': '↤',
+		'↠': '↞',
+		'↝': '↜',
+		'↣': '↢',
+		'⇀': '↼',
+		'⇝': '⇜',
+		'⇢': '⇠',
+		'⤇': '⤆',
+		'☞': '☜',
+		'☛': '☚',
+		'➜': '←',
+		'➔': '←',
+		'➝': '←',
+		'➞': '←'
+	};
+	var UNICODE_ARROW_RE = new RegExp(Object.keys(UNICODE_ARROW_FLIP_MAP).join('|'), 'g');
+
+	/* Technical tokens (acronyms like QR/RFID/API/OK, URLs, versions, numbers)
+	   should not force LTR on a Persian sentence that starts with them. */
+	function isTechnicalNeutralToken(token) {
+		var clean = String(token || '').replace(/^[^\w\u0600-\u06FF]+|[^\w\u0600-\u06FF]+$/g, '');
+		if (!clean) return true;
+		if (RTL_CHAR_RE.test(clean)) return false;
+		if (/^(?:https?:\/\/|www\.)\S+$/i.test(clean)) return true;
+		if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) return true;
+		if (/^v?\d+(?:\.\d+)+(?:-[A-Za-z0-9._-]+)?$/i.test(clean)) return true;
+		if (/^[\d\u06F0-\u06F9]+(?:[|/:.,%-][\d\u06F0-\u06F9A-Za-z]+)*$/.test(clean)) return true;
+		if (/^[A-Z][A-Z0-9_-]{1,5}$/.test(clean)) return true;
+		return false;
+	}
+
+	function detectSmartDir(text, fallbackDir) {
+		var fb = fallbackDir || contentDir || 'ltr';
+		var s = String(text || '').trim();
+		if (!s) return fb;
+		if (!RTL_CHAR_RE.test(s)) {
+			var tokens = s.split(/\s+/);
+			var hasRealLtrWord = false;
+			for (var i = 0; i < tokens.length; i++) {
+				if (/[A-Za-z]/.test(tokens[i]) && !isTechnicalNeutralToken(tokens[i])) {
+					hasRealLtrWord = true;
+					break;
+				}
+			}
+			return hasRealLtrWord ? 'ltr' : fb;
+		}
+		var rtlMatches = s.match(RTL_CHAR_GLOBAL_RE);
+		var rtlCount = rtlMatches ? rtlMatches.length : 0;
+		var stripped = s.split(/\s+/).filter(function (tok) {
+			return !isTechnicalNeutralToken(tok);
+		}).join(' ');
+		var ltrMatches = stripped.match(LTR_CHAR_GLOBAL_RE);
+		var ltrCount = ltrMatches ? ltrMatches.length : 0;
+		if (rtlCount >= ltrCount * 0.35) return 'rtl';
+		var firstStrong = stripped.match(/[\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFFA-Za-z]/);
+		if (firstStrong && RTL_CHAR_RE.test(firstStrong[0])) return 'rtl';
+		return fb === 'rtl' && rtlCount > 0 ? 'rtl' : 'ltr';
+	}
+
+	function flipArrowsInRtlText(text) {
+		var s = String(text || '');
+		if (!s) return s;
+		s = s.replace(UNICODE_ARROW_RE, function (m) {
+			return UNICODE_ARROW_FLIP_MAP[m] || m;
+		});
+		s = s
+			.replace(/(^|\s)==>(?=\s|$)/g, '$1<==')
+			.replace(/(^|\s)-->(?=\s|$)/g, '$1<--')
+			.replace(/(^|\s)=>(?=\s|$)/g, '$1<=')
+			.replace(/(^|\s)->(?=\s|$)/g, '$1<-');
+		/* Guard compound ASCII numeric tokens like 3|4500 so UBA does not reverse them to 4500|3 in RTL */
+		s = s.replace(/\u200E?\b(\d+(?:[|/:.-]\d+)+)\b\u200E?/g, '\u200E$1\u200E');
+		return s;
+	}
+
+	function isHalfSpaceEvent(e) {
+		if (!e) return false;
+		if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey &&
+			(e.code === 'Digit2' || e.code === 'Numpad2' || e.key === '@' || e.key === '2')) {
+			return true;
+		}
+		if (e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && e.code === 'Space') {
+			return true;
+		}
+		return false;
+	}
+
+	function insertHalfSpaceInTextarea(ta, onChanged) {
+		if (!ta) return;
+		var start = ta.selectionStart;
+		var end = ta.selectionEnd;
+		var val = ta.value || '';
+		ta.value = val.slice(0, start) + '\u200C' + val.slice(end);
+		ta.selectionStart = ta.selectionEnd = start + 1;
+		if (typeof onChanged === 'function') onChanged();
 	}
 
 /* ===== src: app/js/src/core/10-markdown.js ===== */
@@ -146,7 +272,7 @@
 	renderer.code = function (code, lang) {
 		var norm = normalizeLang(lang);
 		var safe = escapeHtml(code);
-		if (norm === 'mermaid') {
+		if (norm === 'mermaid' || (!norm && isBareMermaidBlock(code))) {
 			return '<div class="mermaid-wrap" dir="ltr"><pre class="mermaid">' + safe + '</pre></div>';
 		}
 		var langAttr = norm || 'none';
@@ -209,6 +335,80 @@
 		return window.DOMPurify.sanitize(String(html || ''), MD_SANITIZE_CONFIG);
 	}
 
+	function enhanceRtlHtml(html) {
+		if (typeof document === 'undefined' || !html) return html;
+		var wrap = document.createElement('div');
+		wrap.innerHTML = html;
+
+		var tables = wrap.querySelectorAll('table');
+		for (var t = 0; t < tables.length; t++) {
+			var tbl = tables[t];
+			var tblProbe = tbl.cloneNode(true);
+			var tblStrip = tblProbe.querySelectorAll('pre, code, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline');
+			for (var ts = 0; ts < tblStrip.length; ts++) tblStrip[ts].remove();
+			var tblDir = detectSmartDir(tblProbe.textContent, contentDir);
+			tbl.setAttribute('dir', tblDir);
+			var cells = tbl.querySelectorAll('th, td');
+			for (var c = 0; c < cells.length; c++) {
+				cells[c].setAttribute('dir', tblDir);
+			}
+		}
+
+		var blocks = wrap.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote');
+		for (var i = 0; i < blocks.length; i++) {
+			var el = blocks[i];
+			if (el.closest('pre, code, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline')) continue;
+			var probe = el.cloneNode(true);
+			var strip = probe.querySelectorAll('pre, code, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline, ul, ol');
+			for (var j = 0; j < strip.length; j++) strip[j].remove();
+			var dir = detectSmartDir(probe.textContent, contentDir);
+			el.setAttribute('dir', dir);
+		}
+
+		var lists = wrap.querySelectorAll('ul, ol');
+		for (var l = 0; l < lists.length; l++) {
+			var list = lists[l];
+			if (list.closest('pre, code, .mermaid-wrap')) continue;
+			var rtlItems = 0;
+			var ltrItems = 0;
+			var ch = list.children;
+			for (var k = 0; k < ch.length; k++) {
+				if (ch[k].tagName !== 'LI') continue;
+				if (ch[k].getAttribute('dir') === 'rtl') rtlItems++;
+				else if (ch[k].getAttribute('dir') === 'ltr') ltrItems++;
+			}
+			var listDir = rtlItems > 0 && rtlItems >= ltrItems ? 'rtl' : (ltrItems > 0 ? 'ltr' : contentDir);
+			list.setAttribute('dir', listDir);
+		}
+
+		var walker = document.createTreeWalker(wrap, NodeFilter.SHOW_TEXT, null);
+		var textNodes = [];
+		while (walker.nextNode()) textNodes.push(walker.currentNode);
+		for (var n = 0; n < textNodes.length; n++) {
+			var tn = textNodes[n];
+			var val = tn.nodeValue;
+			if (!val) continue;
+			var parent = tn.parentElement;
+			if (!parent) continue;
+			if (parent.closest('pre, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline, script, style')) continue;
+			var inlineCode = parent.closest('code');
+			if (inlineCode) {
+				if (RTL_CHAR_RE.test(inlineCode.textContent || '')) {
+					tn.nodeValue = flipArrowsInRtlText(val);
+				}
+				continue;
+			}
+			var dirHost = parent.closest('[dir]');
+			var isRtlContext = RTL_CHAR_RE.test(val) ||
+				(dirHost && dirHost.getAttribute('dir') === 'rtl' && RTL_CHAR_RE.test(dirHost.textContent || ''));
+			if (isRtlContext) {
+				tn.nodeValue = flipArrowsInRtlText(val);
+			}
+		}
+
+		return wrap.innerHTML;
+	}
+
 	function parseMarkdown(src) {
 		if (typeof window.rtlmdPreprocessMarkdown === 'function') {
 			src = window.rtlmdPreprocessMarkdown(src);
@@ -218,6 +418,7 @@
 		if (typeof window.rtlmdPostprocessMarkdownHtml === 'function') {
 			html = window.rtlmdPostprocessMarkdownHtml(html, src);
 		}
+		html = enhanceRtlHtml(html);
 		return html;
 	}
 
@@ -293,11 +494,46 @@
 			/* already wrapped for current highlight output */
 			return;
 		}
+		/* Wrap full RTL comment bodies in a single <bdi class="code-bidi" dir="rtl"> per line
+		   (keeping //, #, /* markers on the left in LTR) so mixed Persian+English comments stay in RTL order. */
+		var comments = codeEl.querySelectorAll('.token.comment');
+		for (var c = 0; c < comments.length; c++) {
+			var cEl = comments[c];
+			var cText = cEl.textContent || '';
+			if (!RTL_CHAR_RE.test(cText) || cEl.children.length > 0) continue;
+			var lines = cText.split('\n');
+			var cFrag = document.createDocumentFragment();
+			for (var l = 0; l < lines.length; l++) {
+				if (l > 0) cFrag.appendChild(document.createTextNode('\n'));
+				var line = lines[l];
+				if (!RTL_CHAR_RE.test(line)) {
+					cFrag.appendChild(document.createTextNode(line));
+					continue;
+				}
+				var cm = line.match(/^(\s*(?:\/\/+|#+|\/\*+|\*+|<!--+|--+)\s*)([\s\S]*?)(\s*(?:\*\/|-->)\s*)?$/);
+				var prefix = cm ? cm[1] : '';
+				var body = cm ? cm[2] : line;
+				var suffix = (cm && cm[3]) ? cm[3] : '';
+				if (prefix) cFrag.appendChild(document.createTextNode(prefix));
+				if (body) {
+					var cBdi = document.createElement('bdi');
+					cBdi.className = 'code-bidi';
+					cBdi.setAttribute('dir', 'rtl');
+					cBdi.textContent = flipArrowsInRtlText(body);
+					cFrag.appendChild(cBdi);
+				}
+				if (suffix) cFrag.appendChild(document.createTextNode(suffix));
+			}
+			cEl.textContent = '';
+			cEl.appendChild(cFrag);
+		}
+
 		var walker = document.createTreeWalker(codeEl, NodeFilter.SHOW_TEXT, null);
 		var nodes = [];
 		while (walker.nextNode()) nodes.push(walker.currentNode);
 		for (var i = 0; i < nodes.length; i++) {
 			var node = nodes[i];
+			if (node.parentElement && node.parentElement.closest('bdi.code-bidi')) continue;
 			var text = node.nodeValue;
 			if (!text || text.search(/[\u0600-\u06FF]/) === -1) continue;
 			BIDI_RUN_RE.lastIndex = 0;
@@ -312,6 +548,7 @@
 				}
 				var bdi = document.createElement('bdi');
 				bdi.className = 'code-bidi';
+				bdi.setAttribute('dir', 'rtl');
 				bdi.textContent = m[0];
 				frag.appendChild(bdi);
 				last = m.index + m[0].length;
@@ -342,6 +579,66 @@
 		});
 	}
 
+	/* Mermaid edge labels (-->|...|) do not support backslash-escaped pipes (\|);
+	   authors write \| out of Markdown-table habit, causing Mermaid 11 parse errors. */
+	function normalizeMermaidSource(src) {
+		return String(src || '').replace(/\\\|/g, '#124;');
+	}
+
+	function isMermaidErrorSvg(svg) {
+		if (!svg) return false;
+		if (svg.getAttribute('aria-roledescription') === 'error') return true;
+		return !!svg.querySelector('.error-icon, .error-text');
+	}
+
+	function enhanceMermaidBidi(svg) {
+		if (!svg || isMermaidErrorSvg(svg)) return;
+		var fos = svg.querySelectorAll('foreignObject');
+		for (var i = 0; i < fos.length; i++) {
+			var fo = fos[i];
+			var text = fo.textContent || '';
+			var hasRtl = RTL_CHAR_RE.test(text);
+			var dir = hasRtl ? 'rtl' : 'ltr';
+			var innerEls = fo.querySelectorAll('div, span, p');
+			for (var j = 0; j < innerEls.length; j++) {
+				var el = innerEls[j];
+				var elHasRtl = RTL_CHAR_RE.test(el.textContent || '');
+				var elDir = elHasRtl ? 'rtl' : (hasRtl ? 'rtl' : 'ltr');
+				el.setAttribute('dir', elDir);
+				el.style.direction = elDir;
+				el.style.unicodeBidi = 'isolate';
+			}
+			var inlineTags = fo.querySelectorAll('strong, b, em, i, code, a');
+			for (var k = 0; k < inlineTags.length; k++) {
+				inlineTags[k].style.unicodeBidi = 'isolate';
+			}
+			if (hasRtl) {
+				var walker = document.createTreeWalker(fo, NodeFilter.SHOW_TEXT, null);
+				var tNodes = [];
+				while (walker.nextNode()) tNodes.push(walker.currentNode);
+				for (var n = 0; n < tNodes.length; n++) {
+					tNodes[n].nodeValue = flipArrowsInRtlText(tNodes[n].nodeValue);
+				}
+			}
+		}
+
+		var svgTexts = svg.querySelectorAll('text');
+		for (var t = 0; t < svgTexts.length; t++) {
+			var tEl = svgTexts[t];
+			if (tEl.closest('foreignObject')) continue;
+			if (!RTL_CHAR_RE.test(tEl.textContent || '')) continue;
+			tEl.setAttribute('direction', 'rtl');
+			tEl.style.direction = 'rtl';
+			tEl.style.unicodeBidi = 'isolate';
+			var tw = document.createTreeWalker(tEl, NodeFilter.SHOW_TEXT, null);
+			var sNodes = [];
+			while (tw.nextNode()) sNodes.push(tw.currentNode);
+			for (var m = 0; m < sNodes.length; m++) {
+				sNodes[m].nodeValue = flipArrowsInRtlText(sNodes[m].nodeValue);
+			}
+		}
+	}
+
 	function renderMermaid() {
 		if (typeof mermaid === 'undefined') return;
 		var nodes = document.querySelectorAll('#output pre.mermaid');
@@ -353,11 +650,28 @@
 				securityLevel: 'loose',
 				fontFamily: typeof mermaidFontFamily === 'function' ? mermaidFontFamily() : 'Vazirmatn, Tahoma, sans-serif'
 			});
-			mermaid.run({ nodes: nodes }).then(function () {
+			var list = Array.prototype.slice.call(nodes);
+			var chain = Promise.resolve();
+			list.forEach(function (pre) {
+				var raw = pre.getAttribute('data-mermaid-raw') || pre.textContent || '';
+				if (!pre.getAttribute('data-mermaid-raw')) {
+					pre.setAttribute('data-mermaid-raw', raw);
+				}
+				var clean = normalizeMermaidSource(raw);
+				pre.textContent = clean;
+				var wrap = pre.closest('.mermaid-wrap');
+				if (wrap && RTL_CHAR_RE.test(clean)) {
+					wrap.setAttribute('data-mermaid-rtl', '1');
+				}
+				chain = chain.then(function () {
+					return Promise.resolve(mermaid.run({ nodes: [pre] })).catch(function () {
+						/* bad diagram syntax on this node — continue rendering remaining diagrams */
+					});
+				});
+			});
+			chain.then(function () {
 				enhanceMermaidDiagrams();
 				if (scrollSyncOn) refreshScrollMaps();
-			}).catch(function () {
-				/* ponytail: bad diagram syntax — source stays visible in pre */
 			});
 		} catch (e) { /* ponytail: mermaid unavailable */ }
 	}
@@ -381,8 +695,9 @@
 		document.querySelectorAll('#output .mermaid-wrap').forEach(function (wrap) {
 			if (wrap.dataset.mermaidEnhanced === '1') return;
 			var svg = wrap.querySelector('svg');
-			if (!svg) return;
+			if (!svg || isMermaidErrorSvg(svg)) return;
 			wrap.dataset.mermaidEnhanced = '1';
+			enhanceMermaidBidi(svg);
 			normalizeMermaidSvgDimensions(svg);
 
 			var toolbar = document.createElement('div');
@@ -817,13 +1132,23 @@
 		var id = normalizeFontFamily(document.documentElement.getAttribute('data-font-family') || 'vazirmatn');
 		var map = {
 			vazirmatn: 'Vazirmatn, Tahoma, sans-serif',
+			iranyekan: 'IRANYekan, Vazirmatn, Tahoma, sans-serif',
 			sahel: 'Sahel, Vazirmatn, Tahoma, sans-serif',
 			shabnam: 'Shabnam, Vazirmatn, Tahoma, sans-serif',
 			samim: 'Samim, Vazirmatn, Tahoma, sans-serif',
 			estedad: 'Estedad, Vazirmatn, Tahoma, sans-serif',
+			'estedad-fd': '"Estedad FD", Estedad, Vazirmatn, Tahoma, sans-serif',
 			parastoo: 'Parastoo, Vazirmatn, Tahoma, sans-serif',
 			tanha: 'Tanha, Vazirmatn, Tahoma, sans-serif',
+			nahid: 'Nahid, Vazirmatn, Tahoma, sans-serif',
 			gandom: 'Gandom, Vazirmatn, Tahoma, sans-serif',
+			mikhak: 'Mikhak, Vazirmatn, Tahoma, sans-serif',
+			'mikhak-fd': '"Mikhak FD", Mikhak, Vazirmatn, Tahoma, sans-serif',
+			nika: 'Nika, Vazirmatn, Tahoma, sans-serif',
+			arad: 'Arad, Vazirmatn, Tahoma, sans-serif',
+			behdad: 'Behdad, Vazirmatn, Tahoma, sans-serif',
+			ganjname: 'GanjNamehSans, Vazirmatn, Tahoma, sans-serif',
+			shahab: 'Shahab, Vazirmatn, Tahoma, sans-serif',
 			tahoma: 'Tahoma, Segoe UI, sans-serif',
 			system: 'system-ui, Segoe UI, sans-serif'
 		};
@@ -2094,6 +2419,18 @@
 			ok(!!bdi && bdi.textContent === 'این سند خرید', 'code bidi wraps Persian run');
 			ok(el.textContent.indexOf('$x') !== -1, 'code bidi keeps Latin token');
 		})();
+		(function () {
+			ok(normalizeMermaidSource('Q -->|مثال: 3\\|4500| Q3') === 'Q -->|مثال: 3#124;4500| Q3', 'mermaid escaped pipe normalized');
+			ok(detectSmartDir('QR بود؟', 'ltr') === 'rtl', 'smart dir detects RTL after technical acronym');
+			ok(detectSmartDir('RFID روی دستگاه در عمل مثل اثرانگشت است', 'ltr') === 'rtl', 'smart dir detects RTL starting with RFID');
+			ok(detectSmartDir('Hello world this is English', 'rtl') === 'ltr', 'smart dir detects pure English as LTR');
+			ok(flipArrowsInRtlText('ورود → ثبت + کمد') === 'ورود ← ثبت + کمد', 'arrow flip converts rightward arrow in RTL text');
+			ok(flipArrowsInRtlText('مرحله ۱ -> مرحله ۲') === 'مرحله ۱ <- مرحله ۲', 'arrow flip converts spaced ASCII arrow in RTL text');
+			ok(flipArrowsInRtlText('$table->id()') === '$table->id()', 'arrow flip preserves unspaced code arrow');
+			ok(flipArrowsInRtlText('مثال: 3|4500').indexOf('\u200E3|4500\u200E') !== -1, 'compound numeric pipe token guarded with LRM');
+			ok(parseMarkdown('flowchart TD\n    A --> B\n    B --> C').indexOf('class="mermaid"') !== -1, 'bare unfenced flowchart rendered as mermaid');
+			ok(parseMarkdown('```\nflowchart TD\n    A --> B\n```').indexOf('class="mermaid"') !== -1, 'untagged fence flowchart rendered as mermaid');
+		})();
 		ok(storageGet(SCROLL_SYNC_KEY, '0') === '0' || storageGet(SCROLL_SYNC_KEY, '0') === '1', 'scroll sync pref');
 		ok(typeof setScrollSync === 'function' && scrollSyncOn === (storageGet(SCROLL_SYNC_KEY, '0') === '1'), 'scroll sync default wiring');
 		var ranges = sourceBlockRanges('# Title\n\nHello\n');
@@ -2373,6 +2710,7 @@
 			'.markdown-body h2{font-size:1.35em;padding-bottom:.25em;border-bottom:1px solid #e4e4e7}',
 			'.markdown-body h3{font-size:1.15em}',
 			'.markdown-body p{margin:0 0 1em}',
+			'.markdown-body strong,.markdown-body b,.markdown-body em,.markdown-body i,.markdown-body del,.markdown-body s,.markdown-body a{unicode-bidi:isolate}',
 			'.markdown-body a{color:#2563eb}',
 			'.markdown-body ul,.markdown-body ol{margin:0 0 1em;padding-inline-start:1.6em;list-style-position:outside}',
 			'.markdown-body ul{list-style-type:disc}',
@@ -2389,6 +2727,7 @@
 			'.markdown-body .mermaid-wrap{direction:ltr;unicode-bidi:isolate;margin:0 0 1em;padding:1em .75em;overflow:hidden;border:1px solid #cbd5e1;border-radius:.45rem;background:#f8fafc;text-align:center;page-break-inside:avoid;break-inside:avoid}',
 			'.markdown-body pre.mermaid{margin:0;padding:0;background:transparent;border:none;box-shadow:none;text-align:center;white-space:pre-wrap}',
 			'.markdown-body .mermaid-wrap svg{max-width:100%!important;height:auto!important}',
+			'.markdown-body .mermaid-wrap foreignObject [dir="rtl"]{direction:rtl;unicode-bidi:isolate}',
 			'.markdown-body .table-scroll{overflow-x:auto;margin:0 0 1em;border:1px solid #cbd5e1;border-radius:.35rem}',
 			'.markdown-body .table-scroll table{width:max-content;min-width:100%;margin:0;border:none}',
 			'.markdown-body table{width:100%;margin:0 0 1em;border-collapse:collapse;font-size:.92em;border:1.5px solid #cbd5e1;background:#fff;page-break-inside:auto}',
@@ -2588,7 +2927,7 @@
 		if (needsMermaid) {
 			parts.push('<script src="' + VENDOR + 'mermaid/mermaid.min.js"><\/script>');
 			parts.push('<script>mermaid.initialize({startOnLoad:false,theme:"default",securityLevel:"loose",fontFamily:"Vazirmatn, Tahoma, sans-serif"});' +
-				'mermaid.run({nodes:document.querySelectorAll("pre.mermaid:not([data-processed])")}).catch(function(){});<\/script>');
+				'document.querySelectorAll("pre.mermaid:not([data-processed])").forEach(function(n){n.textContent=(n.textContent||"").replace(/\\\\\\|/g,"#124;");mermaid.run({nodes:[n]}).catch(function(){});});<\/script>');
 		}
 		return parts.join('');
 	}
@@ -2945,6 +3284,11 @@
 						e.preventDefault();
 					}
 				}
+				return;
+			}
+			if (isHalfSpaceEvent(e)) {
+				e.preventDefault();
+				insertHalfSpaceInTextarea($editor[0], onEditorChange);
 				return;
 			}
 			if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
@@ -3377,6 +3721,47 @@
 		return out + body.slice(pos);
 	}
 
+	/* Wrap unfenced Mermaid diagrams (e.g. when a user copies raw `flowchart TD ...`
+	   from ChatGPT's diagram Code tab without ```mermaid fences) into fenced blocks
+	   before marked lexes them, preventing 4-space indented lines inside `subgraph`
+	   from being split into indented code blocks. */
+	function wrapBareMermaidBlocks(body) {
+		if (!BARE_MERMAID_HEADER_RE.test(body)) return body;
+		if (isBareMermaidBlock(body)) {
+			return '```mermaid\n' + body.trim() + '\n```\n';
+		}
+		var chunks = body.split(/\n{2,}/);
+		var out = [];
+		var i = 0;
+		while (i < chunks.length) {
+			if (BARE_MERMAID_HEADER_RE.test(chunks[i])) {
+				var diagramLines = [chunks[i]];
+				var j = i + 1;
+				while (j < chunks.length) {
+					var next = chunks[j];
+					var nextTrim = next.trim();
+					if (!nextTrim) { j++; continue; }
+					if (/^(?:#{1,6}\s|[-*+]\s|\d+\.\s|>\s|\|.*\||---+$|\u0000CODE)/.test(nextTrim)) break;
+					if (/^(?:[ \t]+|[A-Za-z0-9_]+(?:\s*-->|\s*---|\s*-\.-|\s*==>|\s*[\[\(\{])|subgraph\b|end\b|direction\b|style\b|classDef\b|class\b|click\b|linkStyle\b|%%)/.test(next)) {
+						diagramLines.push(next);
+						j++;
+					} else {
+						break;
+					}
+				}
+				var candidate = diagramLines.join('\n\n');
+				if (isBareMermaidBlock(candidate)) {
+					out.push('```mermaid\n' + candidate.trim() + '\n```');
+					i = j;
+					continue;
+				}
+			}
+			out.push(chunks[i]);
+			i++;
+		}
+		return out.join('\n\n');
+	}
+
 	function preprocessMarkdown(src) {
 		mathPlaceholders = [];
 		var parts = splitFrontMatter(src);
@@ -3385,6 +3770,8 @@
 		/* Order matters: extract whole fenced blocks first so the inline-code regex
 		   below never runs its backtick matching across (or inside) a fence's content. */
 		var codeStore = [];
+		body = protectCodeRegions(body, FENCE_RE, codeStore);
+		body = wrapBareMermaidBlocks(body);
 		body = protectCodeRegions(body, FENCE_RE, codeStore);
 		body = protectCodeRegions(body, INLINE_CODE_RE, codeStore);
 
@@ -3750,7 +4137,7 @@
 	var LIVE_EDITABLE_TAGS = { P: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, UL: 1, OL: 1, BLOCKQUOTE: 1 };
 	var LIVE_INLINE_OK = {
 		P: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1, UL: 1, OL: 1, LI: 1, BLOCKQUOTE: 1,
-		STRONG: 1, B: 1, EM: 1, I: 1, DEL: 1, S: 1, A: 1, CODE: 1, BR: 1, INPUT: 1
+		STRONG: 1, B: 1, EM: 1, I: 1, DEL: 1, S: 1, A: 1, CODE: 1, BR: 1, INPUT: 1, BDI: 1, SPAN: 1
 	};
 
 	var liveTurndown = null;
@@ -3880,7 +4267,7 @@
 		var clone = el.cloneNode(true);
 		clone.removeAttribute('contenteditable');
 		wrap.appendChild(clone);
-		return liveTurndown.turndown(wrap).replace(/\u00a0/g, ' ').trim();
+		return liveTurndown.turndown(wrap).replace(/\u00a0/g, ' ').replace(/[\u200e\u200f]/g, '').trim();
 	}
 
 	/* ── Source mapping ── */
@@ -3892,6 +4279,11 @@
 		var parts = splitFrontMatter(src);
 		var body = parts.body;
 		var base = src.length - body.length;
+		if (typeof isBareMermaidBlock === 'function' && isBareMermaidBlock(body)) {
+			var trimStart = body.search(/\S/);
+			var trimEnd = body.replace(/\s+$/, '').length;
+			return [{ start: base + (trimStart >= 0 ? trimStart : 0), end: base + trimEnd, type: 'code' }];
+		}
 		var tokens = marked.lexer(body);
 		var ranges = [];
 		var pos = 0;
@@ -4115,7 +4507,11 @@
 	}
 
 	function liveCleanPaste(text) {
-		return String(text || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+		var clean = String(text || '').replace(/\r\n?/g, '\n').replace(/\s+$/, '');
+		if (typeof isBareMermaidBlock === 'function' && isBareMermaidBlock(clean)) {
+			return '```mermaid\n' + clean.trim() + '\n```';
+		}
+		return clean;
 	}
 
 	function liveAppendMarkdown(text) {
@@ -4171,6 +4567,11 @@
 		}
 
 		function onKey(e) {
+			if (isHalfSpaceEvent(e) && document.activeElement === ta) {
+				e.preventDefault();
+				insertHalfSpaceInTextarea(ta);
+				return;
+			}
 			if (e.key === 'Escape') {
 				e.preventDefault();
 				close(false);
@@ -4427,6 +4828,14 @@
 			if (!block || block.getAttribute('contenteditable') !== 'true') return;
 			if (e.key === 'Escape') {
 				block.blur();
+				return;
+			}
+			if (isHalfSpaceEvent(e)) {
+				e.preventDefault();
+				document.execCommand('insertText', false, '\u200C');
+				block.__liveDirty = true;
+				clearTimeout(liveInputTimer);
+				liveInputTimer = setTimeout(function () { liveWriteBlock(block); }, 250);
 				return;
 			}
 			if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey && !e.isComposing &&

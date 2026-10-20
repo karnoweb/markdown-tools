@@ -9,11 +9,46 @@
 			/* already wrapped for current highlight output */
 			return;
 		}
+		/* Wrap full RTL comment bodies in a single <bdi class="code-bidi" dir="rtl"> per line
+		   (keeping //, #, /* markers on the left in LTR) so mixed Persian+English comments stay in RTL order. */
+		var comments = codeEl.querySelectorAll('.token.comment');
+		for (var c = 0; c < comments.length; c++) {
+			var cEl = comments[c];
+			var cText = cEl.textContent || '';
+			if (!RTL_CHAR_RE.test(cText) || cEl.children.length > 0) continue;
+			var lines = cText.split('\n');
+			var cFrag = document.createDocumentFragment();
+			for (var l = 0; l < lines.length; l++) {
+				if (l > 0) cFrag.appendChild(document.createTextNode('\n'));
+				var line = lines[l];
+				if (!RTL_CHAR_RE.test(line)) {
+					cFrag.appendChild(document.createTextNode(line));
+					continue;
+				}
+				var cm = line.match(/^(\s*(?:\/\/+|#+|\/\*+|\*+|<!--+|--+)\s*)([\s\S]*?)(\s*(?:\*\/|-->)\s*)?$/);
+				var prefix = cm ? cm[1] : '';
+				var body = cm ? cm[2] : line;
+				var suffix = (cm && cm[3]) ? cm[3] : '';
+				if (prefix) cFrag.appendChild(document.createTextNode(prefix));
+				if (body) {
+					var cBdi = document.createElement('bdi');
+					cBdi.className = 'code-bidi';
+					cBdi.setAttribute('dir', 'rtl');
+					cBdi.textContent = flipArrowsInRtlText(body);
+					cFrag.appendChild(cBdi);
+				}
+				if (suffix) cFrag.appendChild(document.createTextNode(suffix));
+			}
+			cEl.textContent = '';
+			cEl.appendChild(cFrag);
+		}
+
 		var walker = document.createTreeWalker(codeEl, NodeFilter.SHOW_TEXT, null);
 		var nodes = [];
 		while (walker.nextNode()) nodes.push(walker.currentNode);
 		for (var i = 0; i < nodes.length; i++) {
 			var node = nodes[i];
+			if (node.parentElement && node.parentElement.closest('bdi.code-bidi')) continue;
 			var text = node.nodeValue;
 			if (!text || text.search(/[\u0600-\u06FF]/) === -1) continue;
 			BIDI_RUN_RE.lastIndex = 0;
@@ -28,6 +63,7 @@
 				}
 				var bdi = document.createElement('bdi');
 				bdi.className = 'code-bidi';
+				bdi.setAttribute('dir', 'rtl');
 				bdi.textContent = m[0];
 				frag.appendChild(bdi);
 				last = m.index + m[0].length;
@@ -58,6 +94,66 @@
 		});
 	}
 
+	/* Mermaid edge labels (-->|...|) do not support backslash-escaped pipes (\|);
+	   authors write \| out of Markdown-table habit, causing Mermaid 11 parse errors. */
+	function normalizeMermaidSource(src) {
+		return String(src || '').replace(/\\\|/g, '#124;');
+	}
+
+	function isMermaidErrorSvg(svg) {
+		if (!svg) return false;
+		if (svg.getAttribute('aria-roledescription') === 'error') return true;
+		return !!svg.querySelector('.error-icon, .error-text');
+	}
+
+	function enhanceMermaidBidi(svg) {
+		if (!svg || isMermaidErrorSvg(svg)) return;
+		var fos = svg.querySelectorAll('foreignObject');
+		for (var i = 0; i < fos.length; i++) {
+			var fo = fos[i];
+			var text = fo.textContent || '';
+			var hasRtl = RTL_CHAR_RE.test(text);
+			var dir = hasRtl ? 'rtl' : 'ltr';
+			var innerEls = fo.querySelectorAll('div, span, p');
+			for (var j = 0; j < innerEls.length; j++) {
+				var el = innerEls[j];
+				var elHasRtl = RTL_CHAR_RE.test(el.textContent || '');
+				var elDir = elHasRtl ? 'rtl' : (hasRtl ? 'rtl' : 'ltr');
+				el.setAttribute('dir', elDir);
+				el.style.direction = elDir;
+				el.style.unicodeBidi = 'isolate';
+			}
+			var inlineTags = fo.querySelectorAll('strong, b, em, i, code, a');
+			for (var k = 0; k < inlineTags.length; k++) {
+				inlineTags[k].style.unicodeBidi = 'isolate';
+			}
+			if (hasRtl) {
+				var walker = document.createTreeWalker(fo, NodeFilter.SHOW_TEXT, null);
+				var tNodes = [];
+				while (walker.nextNode()) tNodes.push(walker.currentNode);
+				for (var n = 0; n < tNodes.length; n++) {
+					tNodes[n].nodeValue = flipArrowsInRtlText(tNodes[n].nodeValue);
+				}
+			}
+		}
+
+		var svgTexts = svg.querySelectorAll('text');
+		for (var t = 0; t < svgTexts.length; t++) {
+			var tEl = svgTexts[t];
+			if (tEl.closest('foreignObject')) continue;
+			if (!RTL_CHAR_RE.test(tEl.textContent || '')) continue;
+			tEl.setAttribute('direction', 'rtl');
+			tEl.style.direction = 'rtl';
+			tEl.style.unicodeBidi = 'isolate';
+			var tw = document.createTreeWalker(tEl, NodeFilter.SHOW_TEXT, null);
+			var sNodes = [];
+			while (tw.nextNode()) sNodes.push(tw.currentNode);
+			for (var m = 0; m < sNodes.length; m++) {
+				sNodes[m].nodeValue = flipArrowsInRtlText(sNodes[m].nodeValue);
+			}
+		}
+	}
+
 	function renderMermaid() {
 		if (typeof mermaid === 'undefined') return;
 		var nodes = document.querySelectorAll('#output pre.mermaid');
@@ -69,11 +165,28 @@
 				securityLevel: 'loose',
 				fontFamily: typeof mermaidFontFamily === 'function' ? mermaidFontFamily() : 'Vazirmatn, Tahoma, sans-serif'
 			});
-			mermaid.run({ nodes: nodes }).then(function () {
+			var list = Array.prototype.slice.call(nodes);
+			var chain = Promise.resolve();
+			list.forEach(function (pre) {
+				var raw = pre.getAttribute('data-mermaid-raw') || pre.textContent || '';
+				if (!pre.getAttribute('data-mermaid-raw')) {
+					pre.setAttribute('data-mermaid-raw', raw);
+				}
+				var clean = normalizeMermaidSource(raw);
+				pre.textContent = clean;
+				var wrap = pre.closest('.mermaid-wrap');
+				if (wrap && RTL_CHAR_RE.test(clean)) {
+					wrap.setAttribute('data-mermaid-rtl', '1');
+				}
+				chain = chain.then(function () {
+					return Promise.resolve(mermaid.run({ nodes: [pre] })).catch(function () {
+						/* bad diagram syntax on this node — continue rendering remaining diagrams */
+					});
+				});
+			});
+			chain.then(function () {
 				enhanceMermaidDiagrams();
 				if (scrollSyncOn) refreshScrollMaps();
-			}).catch(function () {
-				/* ponytail: bad diagram syntax — source stays visible in pre */
 			});
 		} catch (e) { /* ponytail: mermaid unavailable */ }
 	}
@@ -97,8 +210,9 @@
 		document.querySelectorAll('#output .mermaid-wrap').forEach(function (wrap) {
 			if (wrap.dataset.mermaidEnhanced === '1') return;
 			var svg = wrap.querySelector('svg');
-			if (!svg) return;
+			if (!svg || isMermaidErrorSvg(svg)) return;
 			wrap.dataset.mermaidEnhanced = '1';
+			enhanceMermaidBidi(svg);
 			normalizeMermaidSvgDimensions(svg);
 
 			var toolbar = document.createElement('div');

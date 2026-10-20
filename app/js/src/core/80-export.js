@@ -91,6 +91,7 @@
 			'.markdown-body h2{font-size:1.35em;padding-bottom:.25em;border-bottom:1px solid #e4e4e7}',
 			'.markdown-body h3{font-size:1.15em}',
 			'.markdown-body p{margin:0 0 1em}',
+			'.markdown-body strong,.markdown-body b,.markdown-body em,.markdown-body i,.markdown-body del,.markdown-body s,.markdown-body a{unicode-bidi:isolate}',
 			'.markdown-body a{color:#2563eb}',
 			'.markdown-body ul,.markdown-body ol{margin:0 0 1em;padding-inline-start:1.6em;list-style-position:outside}',
 			'.markdown-body ul{list-style-type:disc}',
@@ -107,6 +108,7 @@
 			'.markdown-body .mermaid-wrap{direction:ltr;unicode-bidi:isolate;margin:0 0 1em;padding:1em .75em;overflow:hidden;border:1px solid #cbd5e1;border-radius:.45rem;background:#f8fafc;text-align:center;page-break-inside:avoid;break-inside:avoid}',
 			'.markdown-body pre.mermaid{margin:0;padding:0;background:transparent;border:none;box-shadow:none;text-align:center;white-space:pre-wrap}',
 			'.markdown-body .mermaid-wrap svg{max-width:100%!important;height:auto!important}',
+			'.markdown-body .mermaid-wrap foreignObject [dir="rtl"]{direction:rtl;unicode-bidi:isolate}',
 			'.markdown-body .table-scroll{overflow-x:auto;margin:0 0 1em;border:1px solid #cbd5e1;border-radius:.35rem}',
 			'.markdown-body .table-scroll table{width:max-content;min-width:100%;margin:0;border:none}',
 			'.markdown-body table{width:100%;margin:0 0 1em;border-collapse:collapse;font-size:.92em;border:1.5px solid #cbd5e1;background:#fff;page-break-inside:auto}',
@@ -306,7 +308,7 @@
 		if (needsMermaid) {
 			parts.push('<script src="' + VENDOR + 'mermaid/mermaid.min.js"><\/script>');
 			parts.push('<script>mermaid.initialize({startOnLoad:false,theme:"default",securityLevel:"loose",fontFamily:"Vazirmatn, Tahoma, sans-serif"});' +
-				'mermaid.run({nodes:document.querySelectorAll("pre.mermaid:not([data-processed])")}).catch(function(){});<\/script>');
+				'document.querySelectorAll("pre.mermaid:not([data-processed])").forEach(function(n){n.textContent=(n.textContent||"").replace(/\\\\\\|/g,"#124;");mermaid.run({nodes:[n]}).catch(function(){});});<\/script>');
 		}
 		return parts.join('');
 	}
@@ -663,6 +665,11 @@
 						e.preventDefault();
 					}
 				}
+				return;
+			}
+			if (isHalfSpaceEvent(e)) {
+				e.preventDefault();
+				insertHalfSpaceInTextarea($editor[0], onEditorChange);
 				return;
 			}
 			if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;

@@ -41,7 +41,7 @@
 	renderer.code = function (code, lang) {
 		var norm = normalizeLang(lang);
 		var safe = escapeHtml(code);
-		if (norm === 'mermaid') {
+		if (norm === 'mermaid' || (!norm && isBareMermaidBlock(code))) {
 			return '<div class="mermaid-wrap" dir="ltr"><pre class="mermaid">' + safe + '</pre></div>';
 		}
 		var langAttr = norm || 'none';
@@ -104,6 +104,80 @@
 		return window.DOMPurify.sanitize(String(html || ''), MD_SANITIZE_CONFIG);
 	}
 
+	function enhanceRtlHtml(html) {
+		if (typeof document === 'undefined' || !html) return html;
+		var wrap = document.createElement('div');
+		wrap.innerHTML = html;
+
+		var tables = wrap.querySelectorAll('table');
+		for (var t = 0; t < tables.length; t++) {
+			var tbl = tables[t];
+			var tblProbe = tbl.cloneNode(true);
+			var tblStrip = tblProbe.querySelectorAll('pre, code, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline');
+			for (var ts = 0; ts < tblStrip.length; ts++) tblStrip[ts].remove();
+			var tblDir = detectSmartDir(tblProbe.textContent, contentDir);
+			tbl.setAttribute('dir', tblDir);
+			var cells = tbl.querySelectorAll('th, td');
+			for (var c = 0; c < cells.length; c++) {
+				cells[c].setAttribute('dir', tblDir);
+			}
+		}
+
+		var blocks = wrap.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote');
+		for (var i = 0; i < blocks.length; i++) {
+			var el = blocks[i];
+			if (el.closest('pre, code, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline')) continue;
+			var probe = el.cloneNode(true);
+			var strip = probe.querySelectorAll('pre, code, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline, ul, ol');
+			for (var j = 0; j < strip.length; j++) strip[j].remove();
+			var dir = detectSmartDir(probe.textContent, contentDir);
+			el.setAttribute('dir', dir);
+		}
+
+		var lists = wrap.querySelectorAll('ul, ol');
+		for (var l = 0; l < lists.length; l++) {
+			var list = lists[l];
+			if (list.closest('pre, code, .mermaid-wrap')) continue;
+			var rtlItems = 0;
+			var ltrItems = 0;
+			var ch = list.children;
+			for (var k = 0; k < ch.length; k++) {
+				if (ch[k].tagName !== 'LI') continue;
+				if (ch[k].getAttribute('dir') === 'rtl') rtlItems++;
+				else if (ch[k].getAttribute('dir') === 'ltr') ltrItems++;
+			}
+			var listDir = rtlItems > 0 && rtlItems >= ltrItems ? 'rtl' : (ltrItems > 0 ? 'ltr' : contentDir);
+			list.setAttribute('dir', listDir);
+		}
+
+		var walker = document.createTreeWalker(wrap, NodeFilter.SHOW_TEXT, null);
+		var textNodes = [];
+		while (walker.nextNode()) textNodes.push(walker.currentNode);
+		for (var n = 0; n < textNodes.length; n++) {
+			var tn = textNodes[n];
+			var val = tn.nodeValue;
+			if (!val) continue;
+			var parent = tn.parentElement;
+			if (!parent) continue;
+			if (parent.closest('pre, .mermaid-wrap, .katex, .katex-display, .math-block, .math-inline, script, style')) continue;
+			var inlineCode = parent.closest('code');
+			if (inlineCode) {
+				if (RTL_CHAR_RE.test(inlineCode.textContent || '')) {
+					tn.nodeValue = flipArrowsInRtlText(val);
+				}
+				continue;
+			}
+			var dirHost = parent.closest('[dir]');
+			var isRtlContext = RTL_CHAR_RE.test(val) ||
+				(dirHost && dirHost.getAttribute('dir') === 'rtl' && RTL_CHAR_RE.test(dirHost.textContent || ''));
+			if (isRtlContext) {
+				tn.nodeValue = flipArrowsInRtlText(val);
+			}
+		}
+
+		return wrap.innerHTML;
+	}
+
 	function parseMarkdown(src) {
 		if (typeof window.rtlmdPreprocessMarkdown === 'function') {
 			src = window.rtlmdPreprocessMarkdown(src);
@@ -113,6 +187,7 @@
 		if (typeof window.rtlmdPostprocessMarkdownHtml === 'function') {
 			html = window.rtlmdPostprocessMarkdownHtml(html, src);
 		}
+		html = enhanceRtlHtml(html);
 		return html;
 	}
 

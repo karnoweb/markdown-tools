@@ -21,7 +21,7 @@
 		<script>
 		(function () {
 			/* Bump RTLMD_ASSET_VER when CSS/JS changes (same ?v= on all app stylesheets + bundle). */
-			window.RTLMD_ASSET_VER = '12';
+			window.RTLMD_ASSET_VER = '15';
 			var PREFS_VER = '3';
 			try {
 				if (localStorage.getItem('rtlmd-prefs-ver') !== PREFS_VER) {
@@ -43,7 +43,7 @@
 				document.documentElement.setAttribute('data-font-size', fontSize);
 			}
 			var fontFamily = localStorage.getItem('rtlmd-font-family');
-			if (['vazirmatn', 'sahel', 'shabnam', 'samim', 'estedad', 'parastoo', 'tanha', 'gandom', 'tahoma', 'system'].indexOf(fontFamily) !== -1) {
+			if (['vazirmatn', 'iranyekan', 'sahel', 'shabnam', 'samim', 'estedad', 'estedad-fd', 'parastoo', 'tanha', 'nahid', 'gandom', 'mikhak', 'mikhak-fd', 'nika', 'arad', 'behdad', 'ganjname', 'shahab', 'tahoma', 'system'].indexOf(fontFamily) !== -1) {
 				document.documentElement.setAttribute('data-font-family', fontFamily);
 			}
 			var mobile = matchMedia('(max-width: 768px)').matches;
@@ -59,15 +59,15 @@
 		<link id="prism-theme" href="assets/vendor/prism/themes/prism-tomorrow.min.css" rel="stylesheet">
 		<link href="assets/vendor/tailwind.css" rel="stylesheet">
 		<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
-		<link rel="stylesheet" href="app/css/00-tokens-base.css?v=12">
-		<link rel="stylesheet" href="app/css/01-appbar.css?v=12">
-		<link rel="stylesheet" href="app/css/02-sidebar.css?v=12">
-		<link rel="stylesheet" href="app/css/03-editor.css?v=12">
-		<link rel="stylesheet" href="app/css/04-fullview.css?v=12">
-		<link rel="stylesheet" href="app/css/05-preview.css?v=12">
-		<link rel="stylesheet" href="app/css/06-responsive.css?v=12">
-		<link rel="stylesheet" href="app/css/07-components.css?v=12">
-		<link rel="stylesheet" href="app/css/08-settings.css?v=12">
+		<link rel="stylesheet" href="app/css/00-tokens-base.css?v=15">
+		<link rel="stylesheet" href="app/css/01-appbar.css?v=15">
+		<link rel="stylesheet" href="app/css/02-sidebar.css?v=15">
+		<link rel="stylesheet" href="app/css/03-editor.css?v=15">
+		<link rel="stylesheet" href="app/css/04-fullview.css?v=15">
+		<link rel="stylesheet" href="app/css/05-preview.css?v=15">
+		<link rel="stylesheet" href="app/css/06-responsive.css?v=15">
+		<link rel="stylesheet" href="app/css/07-components.css?v=15">
+		<link rel="stylesheet" href="app/css/08-settings.css?v=15">
 	</head>
 	<body>
 		<header id="header" class="app-bar">
@@ -111,13 +111,23 @@
 					<span class="sr-only">Reading font</span>
 					<select id="font-family-select" class="select select-sm select-bordered" aria-label="Reading font">
 						<option value="vazirmatn">وزیرمتن · Vazirmatn</option>
+						<option value="iranyekan">ایران‌یکان · IRANYekan</option>
 						<option value="sahel">ساحل · Sahel</option>
 						<option value="shabnam">شبنم · Shabnam</option>
 						<option value="samim">صمیم · Samim</option>
 						<option value="estedad">استعداد · Estedad</option>
+						<option value="estedad-fd">استعداد (اعداد فارسی) · Estedad FD</option>
 						<option value="parastoo">پرستو · Parastoo</option>
 						<option value="tanha">تنها · Tanha</option>
+						<option value="nahid">ناهید · Nahid</option>
 						<option value="gandom">گندم · Gandom</option>
+						<option value="mikhak">میخک · Mikhak</option>
+						<option value="mikhak-fd">میخک (اعداد فارسی) · Mikhak FD</option>
+						<option value="nika">نیکا · Nika</option>
+						<option value="arad">آراد · Arad</option>
+						<option value="behdad">بهداد · Behdad</option>
+						<option value="ganjname">گنج‌نامه · GanjNameh</option>
+						<option value="shahab">شهاب · Shahab</option>
 						<option value="tahoma">Tahoma</option>
 						<option value="system">System</option>
 					</select>
@@ -380,6 +390,6 @@
 		<script src="assets/vendor/mermaid/mermaid.min.js"></script>
 		<script src="assets/vendor/html-to-image/html-to-image.js"></script>
 		<script src="assets/vendor/katex/katex.min.js"></script>
-		<script src="app/js/rtlmd.bundle.js?v=12"></script>
+		<script src="app/js/rtlmd.bundle.js?v=15"></script>
 	</body>
 </html>
